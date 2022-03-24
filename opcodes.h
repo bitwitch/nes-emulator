@@ -1,5 +1,7 @@
 
-case 0x00: printf("BRK impl\n"); break;
+case 0x00: /* BRK impl */
+    exit(1); /* TEMPORARY */
+    break;
 case 0x01: printf("ORA X, ind\n"); break;
 case 0x05: printf("ORA zpg\n"); break;
 case 0x06: printf("ASL zpg\n"); break;
@@ -64,7 +66,9 @@ case 0x61: printf("ADC X, ind\n"); break;
 case 0x65: printf("ADC zpg\n"); break;
 case 0x66: printf("ROR zpg\n"); break;
 case 0x68: printf("PLA imp\n"); break;
-case 0x69: printf("ADC #\n"); break;
+case 0x69: /* ADC # */
+    cpu->a_reg += read_addr(cpu->pc++);
+    break;
 case 0x6A: printf("ROR A\n"); break;
 case 0x6C: printf("JMP ind\n"); break;
 case 0x6D: printf("ADC abs\n"); break;
@@ -167,5 +171,12 @@ case 0xFD: printf("SBC abs, X\n"); break;
 case 0xFE: printf("INC abs, X\n"); break;
 
 default: printf("illegal opcode 0x%.2X\n", opcode); break;
+
+
+
+
+
+
+
 
 
