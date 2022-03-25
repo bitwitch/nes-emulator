@@ -22,83 +22,82 @@ uint8_t get_flag(cpu_6502_t *cpu, status_mask_t mask) {
 /****************************************************************************/
 uint16_t am_imp(cpu_6502_t *cpu) { return 0; }
 
-uint16_t am_abs(cpu_6502_t *cpu) {
+uint8_t am_abs(cpu_6502_t *cpu) {
     word_t operand;
     operand.byte.l = read_address(cpu->pc++);
     operand.byte.h = read_address(cpu->pc++);
-    return operand.w;
+    return read_address(operand.w);
 }
 
-uint16_t am_abs_x(cpu_6502_t *cpu) {
+uint8_t am_abs_x(cpu_6502_t *cpu) {
     word_t operand;
     operand.byte.l = read_address(cpu->pc++);
     operand.byte.h = read_address(cpu->pc++);
     operand.w += cpu->x;
-    return operand.w;
+    return read_address(operand.w);
 }
 
-uint16_t am_abs_y(cpu_6502_t *cpu) {
+uint8_t am_abs_y(cpu_6502_t *cpu) {
     word_t operand;
     operand.byte.l = read_address(cpu->pc++);
     operand.byte.h = read_address(cpu->pc++);
     operand.w += cpu->y;
-    return operand.w;
+    return read_address(operand.w);
 }
 
-uint16_t am_imm(cpu_6502_t *cpu) {
+uint8_t am_imm(cpu_6502_t *cpu) {
     return read_address(cpu->pc++);
 }
 
-uint16_t am_ind(cpu_6502_t *cpu) {
+uint8_t am_ind(cpu_6502_t *cpu) {
     word_t operand, pointer;
     pointer.byte.l = read_address(cpu->pc++);
     pointer.byte.h = read_address(cpu->pc++);
     operand.byte.l = read_address(pointer.w);
     operand.byte.h = read_address(pointer.w+1);
-    return operand.w;
+    return read_address(operand.w);
 }
 
-uint16_t am_x_ind(cpu_6502_t *cpu) {
+uint8_t am_x_ind(cpu_6502_t *cpu) {
     word_t operand;
     uint8_t zpg = cpu->x + read_address(cpu->pc++);
     operand.byte.l = read_address(zpg);
     operand.byte.h = read_address(zpg+1);
     /* TODO(shaw) must handle if the byte at zpg+1 is not in page zero */
-    return operand.w;
+    return read_address(operand.w);
 }
 
-uint16_t am_ind_y(cpu_6502_t *cpu) {
+uint8_t am_ind_y(cpu_6502_t *cpu) {
     word_t operand;
     uint8_t zpg = read_address(cpu->pc++);
     uint16_t sum = cpu->y + read_address(zpg);
     uint8_t carry = (sum >> 8) != 0; 
     operand.byte.l = sum & 0xFF;
     operand.byte.h = read_address(zpg+1) + carry;
-    return operand.w;
+    return read_address(operand.w);
 }
 
-uint16_t am_rel(cpu_6502_t *cpu) {
+uint8_t am_rel(cpu_6502_t *cpu) {
     /* NOTE: signed offset */
     int8_t offset = read_address(cpu->pc++);
-    return cpu->pc + offset;
+    return read_address(cpu->pc + offset);
     /* TODO(shaw) if a page transition occurs, then an extra cycle must
      * be added to execution */
 }
 
-uint16_t am_zpg(cpu_6502_t *cpu) {
-    return read_address(cpu->pc++);
+uint8_t am_zpg(cpu_6502_t *cpu) {
+    return read_address(read_address(cpu->pc++);
 }
 
-uint16_t am_zpg_x(cpu_6502_t *cpu) {
+uint8_t am_zpg_x(cpu_6502_t *cpu) {
     uint8_t operand = cpu->x + read_address(cpu->pc++);
-    return operand;
+    return read_address(operand);
 }
 
-uint16_t am_zpg_y(cpu_6502_t *cpu) {
+uint8_t am_zpg_y(cpu_6502_t *cpu) {
     uint8_t operand = cpu->y + read_address(cpu->pc++);
-    return operand;
+    return read_address(operand);
 }
-
 
 /****************************************************************************/
 /* operations */
