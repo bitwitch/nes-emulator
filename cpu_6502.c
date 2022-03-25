@@ -3,24 +3,6 @@
 #include "cpu_6502.h"
 #include "ops.h"
 
-typedef enum {
-    IMP, 
-    ABS, ABS_X, ABS_Y,
-    IMM,
-    IND, X_IND, IND_Y,
-    REL,
-    ZPG, ZPG_X, ZPG_Y
-} addr_mode_t;
-
-typedef struct {
-    char name[4];
-    uint8_t cycles;
-    /* function pointer to address mode */
-    uint16_t (*addr_mode)(cpu_6502_t *cpu);             
-    /* function pointer to operation */
-    void (*execute)(cpu_6502_t *cpu, uint16_t operand); 
-} op_t;
-
 typedef union {
     uint16_t w;
 #ifdef CPU6502_BIG_ENDIAN
@@ -30,122 +12,324 @@ typedef union {
 #endif
 } word_t;
 
-#define OP_COUNT 256
 
-/* 
-   cyles table taken from Marat Fayzullin
-   https://fms.komkon.org/EMUL8/
-*/
-static uint8_t cycles[OP_COUNT] = {
-  7,6,2,8,3,3,5,5,3,2,2,2,4,4,6,6,
-  2,5,2,8,4,4,6,6,2,4,2,7,5,5,7,7,
-  6,6,2,8,3,3,5,5,4,2,2,2,4,4,6,6,
-  2,5,2,8,4,4,6,6,2,4,2,7,5,5,7,7,
-  6,6,2,8,3,3,5,5,3,2,2,2,3,4,6,6,
-  2,5,2,8,4,4,6,6,2,4,2,7,5,5,7,7,
-  6,6,2,8,3,3,5,5,4,2,2,2,5,4,6,6,
-  2,5,2,8,4,4,6,6,2,4,2,7,5,5,7,7,
-  2,6,2,6,3,3,3,3,2,2,2,2,4,4,4,4,
-  2,6,2,6,4,4,4,4,2,5,2,5,5,5,5,5,
-  2,6,2,6,3,3,3,3,2,2,2,2,4,4,4,4,
-  2,5,2,5,4,4,4,4,2,4,2,5,4,4,4,4,
-  2,6,2,8,3,3,5,5,2,2,2,2,4,4,6,6,
-  2,5,2,8,4,4,6,6,2,4,2,7,5,5,7,7,
-  2,6,2,8,3,3,5,5,2,2,2,2,4,4,6,6,
-  2,5,2,8,4,4,6,6,2,4,2,7,5,5,7,7
-};
+uint8_t get_flag(cpu_6502_t *cpu, status_mask_t mask) {
+    return (cpu->status & mask) != 0;
+}
 
-static inline op_brk(uint16_t operand) {}
-static inline op_ora(uint16_t operand) {}
-static inline op_xxx(uint16_t operand) {}
-static inline op_asl(uint16_t operand) {}
+/****************************************************************************/
+/* address modes */
+/****************************************************************************/
+uint16_t am_imp(cpu_6502_t *cpu) { return 0; }
 
-op_t ops[OP_COUNT] = {
-    {"BRK", 7, &am_imp, &op_brk}, {"ORA", 6, &am_xind, &op_ora}, {"xxx", 2, &am_imp, &op_xxx}, {"xxx", 2, &am_imp, &op_xxx}, {"xxx", 2, &am_imp, &op_xxx}, {"ORA", 3, &am_zpg, &op_ora}, {"ASL", 5, &am_zpg, &op_asl}, {"xxx", 2, &am_imp, &op_xxx}, {"PHP", 3, &am_imp, &op_php}, {"ORA", 2, &am_imm, &op_ora}, {"ASL", 2, &am_imp, &op_asl}, {"xxx", 2, &am_imp, &op_xxx}, {"xxx", 2, &am_imp, &op_xxx}, {"ORA", 4, &am_abs, &op_ora}, {"ASL", 6, &am_abs, &op_asl}, {"xxx", 2, &am_imp, &op_xxx},
-
-
-
-};
-
-
-
-/* calculates the operand to an instruction, based on the addressing mode */
-static uint16_t calculate_operand(cpu_6502_t *cpu, addr_mode_t addr_mode) {
-    word_t operand = {0};
-    switch (addr_mode) {
-        case IMP: 
-            return 0; /* no operand used */
-        case ABS: 
-            operand.byte.l = read_address(cpu->pc++);
-            operand.byte.h = read_address(cpu->pc++);
-            break;
-        case ABS_X: 
-            operand.byte.l = read_address(cpu->pc++);
-            operand.byte.h = read_address(cpu->pc++);
-            operand.w += cpu->x;
-            break;
-        case ABS_Y: 
-            operand.byte.l = read_address(cpu->pc++);
-            operand.byte.h = read_address(cpu->pc++);
-            operand.w += cpu->y;
-            break;
-        case IMM: 
-            operand.byte.l = read_address(cpu->pc++);
-            break;
-        case IND: 
-        {
-            word_t pointer = {0};
-            pointer.byte.l = read_address(cpu->pc++);
-            pointer.byte.h = read_address(cpu->pc++);
-            operand.byte.l = read_address(pointer.w);
-            operand.byte.h = read_address(pointer.w+1);
-            break;
-        }
-        case X_IND: 
-        {
-            uint8_t zpg = cpu->x + read_address(cpu->pc++);
-            operand.byte.l = read_address(zpg);
-            operand.byte.h = read_address(zpg+1);
-            /* TODO(shaw) must handle if the byte at zpg+1 is not in page zero */
-            break;
-        }
-        case IND_Y: 
-        {
-            uint8_t zpg = read_address(cpu->pc++);
-            uint16_t sum = cpu->y + read_address(zpg);
-            uint8_t carry = 1 && (sum >> 8); 
-            operand.byte.l = sum & 0xFF;
-            operand.byte.h = read_address(zpg+1) + carry;
-            break;
-        }
-        case REL: 
-        {
-            /* NOTE: signed offset */
-            int8_t offset = read_address(cpu->pc++);
-            operand.w = cpu->pc + offset;
-            /* TODO(shaw) if a page transition occurs, then an extra cycle must
-             * be added to execution */
-            break;
-        }
-        case ZPG: 
-            operand.byte.l = read_address(cpu->pc++);
-            break;
-        case ZPG_X: 
-            operand.byte.l = cpu->x + read_address(cpu->pc++);
-            break;
-        case ZPG_Y: 
-            operand.byte.l = cpu->y + read_address(cpu->pc++);
-            break;
-        default: 
-            assert(0 && "unknown addressing mode");
-            break;
-    }
+uint16_t am_abs(cpu_6502_t *cpu) {
+    word_t operand;
+    operand.byte.l = read_address(cpu->pc++);
+    operand.byte.h = read_address(cpu->pc++);
     return operand.w;
 }
 
-static void execute_op(cpu_6502_t *cpu, op_t op, uint16_t operand) {
-    
+uint16_t am_abs_x(cpu_6502_t *cpu) {
+    word_t operand;
+    operand.byte.l = read_address(cpu->pc++);
+    operand.byte.h = read_address(cpu->pc++);
+    operand.w += cpu->x;
+    return operand.w;
 }
+
+uint16_t am_abs_y(cpu_6502_t *cpu) {
+    word_t operand;
+    operand.byte.l = read_address(cpu->pc++);
+    operand.byte.h = read_address(cpu->pc++);
+    operand.w += cpu->y;
+    return operand.w;
+}
+
+uint16_t am_imm(cpu_6502_t *cpu) {
+    return read_address(cpu->pc++);
+}
+
+uint16_t am_ind(cpu_6502_t *cpu) {
+    word_t operand, pointer;
+    pointer.byte.l = read_address(cpu->pc++);
+    pointer.byte.h = read_address(cpu->pc++);
+    operand.byte.l = read_address(pointer.w);
+    operand.byte.h = read_address(pointer.w+1);
+    return operand.w;
+}
+
+uint16_t am_x_ind(cpu_6502_t *cpu) {
+    word_t operand;
+    uint8_t zpg = cpu->x + read_address(cpu->pc++);
+    operand.byte.l = read_address(zpg);
+    operand.byte.h = read_address(zpg+1);
+    /* TODO(shaw) must handle if the byte at zpg+1 is not in page zero */
+    return operand.w;
+}
+
+uint16_t am_ind_y(cpu_6502_t *cpu) {
+    word_t operand;
+    uint8_t zpg = read_address(cpu->pc++);
+    uint16_t sum = cpu->y + read_address(zpg);
+    uint8_t carry = (sum >> 8) != 0; 
+    operand.byte.l = sum & 0xFF;
+    operand.byte.h = read_address(zpg+1) + carry;
+    return operand.w;
+}
+
+uint16_t am_rel(cpu_6502_t *cpu) {
+    /* NOTE: signed offset */
+    int8_t offset = read_address(cpu->pc++);
+    return cpu->pc + offset;
+    /* TODO(shaw) if a page transition occurs, then an extra cycle must
+     * be added to execution */
+}
+
+uint16_t am_zpg(cpu_6502_t *cpu) {
+    return read_address(cpu->pc++);
+}
+
+uint16_t am_zpg_x(cpu_6502_t *cpu) {
+    uint8_t operand = cpu->x + read_address(cpu->pc++);
+    return operand;
+}
+
+uint16_t am_zpg_y(cpu_6502_t *cpu) {
+    uint8_t operand = cpu->y + read_address(cpu->pc++);
+    return operand;
+}
+
+
+/****************************************************************************/
+/* operations */
+/****************************************************************************/
+uint8_t op_adc(cpu_6502_t *cpu, uint8_t opcode, uint16_t operand) {
+    uint16_t temp = cpu->a + operand + get_flag(cpu, STATUS_C);
+}
+
+uint8_t op_and(cpu_6502_t *cpu, uint16_t operand){
+    assert(0 && "not implemented");
+    return 0;
+}
+uint8_t op_asl(cpu_6502_t *cpu, uint16_t operand){
+    assert(0 && "not implemented");
+    return 0;
+}
+uint8_t op_bcc(cpu_6502_t *cpu, uint16_t operand){
+    assert(0 && "not implemented");
+    return 0;
+}
+uint8_t op_bcs(cpu_6502_t *cpu, uint16_t operand){
+    assert(0 && "not implemented");
+    return 0;
+}
+uint8_t op_beq(cpu_6502_t *cpu, uint16_t operand){
+    assert(0 && "not implemented");
+    return 0;
+}
+uint8_t op_bit(cpu_6502_t *cpu, uint16_t operand){
+    assert(0 && "not implemented");
+    return 0;
+}
+uint8_t op_bmi(cpu_6502_t *cpu, uint16_t operand){
+    assert(0 && "not implemented");
+    return 0;
+}
+uint8_t op_bne(cpu_6502_t *cpu, uint16_t operand){
+    assert(0 && "not implemented");
+    return 0;
+}
+uint8_t op_bpl(cpu_6502_t *cpu, uint16_t operand){
+    assert(0 && "not implemented");
+    return 0;
+}
+uint8_t op_brk(cpu_6502_t *cpu, uint16_t operand){
+    assert(0 && "not implemented");
+    return 0;
+}
+uint8_t op_bvc(cpu_6502_t *cpu, uint16_t operand){
+    assert(0 && "not implemented");
+    return 0;
+}
+uint8_t op_bvs(cpu_6502_t *cpu, uint16_t operand){
+    assert(0 && "not implemented");
+    return 0;
+}
+uint8_t op_clc(cpu_6502_t *cpu, uint16_t operand){
+    assert(0 && "not implemented");
+    return 0;
+}
+uint8_t op_cld(cpu_6502_t *cpu, uint16_t operand){
+    assert(0 && "not implemented");
+    return 0;
+}
+uint8_t op_cli(cpu_6502_t *cpu, uint16_t operand){
+    assert(0 && "not implemented");
+    return 0;
+}
+uint8_t op_clv(cpu_6502_t *cpu, uint16_t operand){
+    assert(0 && "not implemented");
+    return 0;
+}
+uint8_t op_cmp(cpu_6502_t *cpu, uint16_t operand){
+    assert(0 && "not implemented");
+    return 0;
+}
+uint8_t op_cpx(cpu_6502_t *cpu, uint16_t operand){
+    assert(0 && "not implemented");
+    return 0;
+}
+uint8_t op_cpy(cpu_6502_t *cpu, uint16_t operand){
+    assert(0 && "not implemented");
+    return 0;
+}
+uint8_t op_dec(cpu_6502_t *cpu, uint16_t operand){
+    assert(0 && "not implemented");
+    return 0;
+}
+uint8_t op_dex(cpu_6502_t *cpu, uint16_t operand){
+    assert(0 && "not implemented");
+    return 0;
+}
+uint8_t op_dey(cpu_6502_t *cpu, uint16_t operand){
+    assert(0 && "not implemented");
+    return 0;
+}
+uint8_t op_eor(cpu_6502_t *cpu, uint16_t operand){
+    assert(0 && "not implemented");
+    return 0;
+}
+uint8_t op_inc(cpu_6502_t *cpu, uint16_t operand){
+    assert(0 && "not implemented");
+    return 0;
+}
+uint8_t op_inx(cpu_6502_t *cpu, uint16_t operand){
+    assert(0 && "not implemented");
+    return 0;
+}
+uint8_t op_iny(cpu_6502_t *cpu, uint16_t operand){
+    assert(0 && "not implemented");
+    return 0;
+}
+uint8_t op_jmp(cpu_6502_t *cpu, uint16_t operand){
+    assert(0 && "not implemented");
+    return 0;
+}
+uint8_t op_jsr(cpu_6502_t *cpu, uint16_t operand){
+    assert(0 && "not implemented");
+    return 0;
+}
+uint8_t op_lda(cpu_6502_t *cpu, uint16_t operand){
+    assert(0 && "not implemented");
+    return 0;
+}
+uint8_t op_ldx(cpu_6502_t *cpu, uint16_t operand){
+    assert(0 && "not implemented");
+    return 0;
+}
+uint8_t op_ldy(cpu_6502_t *cpu, uint16_t operand){
+    assert(0 && "not implemented");
+    return 0;
+}
+uint8_t op_lsr(cpu_6502_t *cpu, uint16_t operand){
+    assert(0 && "not implemented");
+    return 0;
+}
+uint8_t op_nop(cpu_6502_t *cpu, uint16_t operand){
+    assert(0 && "not implemented");
+    return 0;
+}
+uint8_t op_ora(cpu_6502_t *cpu, uint16_t operand){
+    assert(0 && "not implemented");
+    return 0;
+}
+uint8_t op_pha(cpu_6502_t *cpu, uint16_t operand){
+    assert(0 && "not implemented");
+    return 0;
+}
+uint8_t op_php(cpu_6502_t *cpu, uint16_t operand){
+    assert(0 && "not implemented");
+    return 0;
+}
+uint8_t op_pla(cpu_6502_t *cpu, uint16_t operand){
+    assert(0 && "not implemented");
+    return 0;
+}
+uint8_t op_plp(cpu_6502_t *cpu, uint16_t operand){
+    assert(0 && "not implemented");
+    return 0;
+}
+uint8_t op_rol(cpu_6502_t *cpu, uint16_t operand){
+    assert(0 && "not implemented");
+    return 0;
+}
+uint8_t op_ror(cpu_6502_t *cpu, uint16_t operand){
+    assert(0 && "not implemented");
+    return 0;
+}
+uint8_t op_rti(cpu_6502_t *cpu, uint16_t operand){
+    assert(0 && "not implemented");
+    return 0;
+}
+uint8_t op_rts(cpu_6502_t *cpu, uint16_t operand){
+    assert(0 && "not implemented");
+    return 0;
+}
+uint8_t op_sbc(cpu_6502_t *cpu, uint16_t operand){
+    assert(0 && "not implemented");
+    return 0;
+}
+uint8_t op_sec(cpu_6502_t *cpu, uint16_t operand){
+    assert(0 && "not implemented");
+    return 0;
+}
+uint8_t op_sed(cpu_6502_t *cpu, uint16_t operand){
+    assert(0 && "not implemented");
+    return 0;
+}
+uint8_t op_sei(cpu_6502_t *cpu, uint16_t operand){
+    assert(0 && "not implemented");
+    return 0;
+}
+uint8_t op_sta(cpu_6502_t *cpu, uint16_t operand){
+    assert(0 && "not implemented");
+    return 0;
+}
+uint8_t op_stx(cpu_6502_t *cpu, uint16_t operand){
+    assert(0 && "not implemented");
+    return 0;
+}
+uint8_t op_sty(cpu_6502_t *cpu, uint16_t operand){
+    assert(0 && "not implemented");
+    return 0;
+}
+uint8_t op_tax(cpu_6502_t *cpu, uint16_t operand){
+    assert(0 && "not implemented");
+    return 0;
+}
+uint8_t op_tay(cpu_6502_t *cpu, uint16_t operand){
+    assert(0 && "not implemented");
+    return 0;
+}
+uint8_t op_tsx(cpu_6502_t *cpu, uint16_t operand){
+    assert(0 && "not implemented");
+    return 0;
+}
+uint8_t op_txa(cpu_6502_t *cpu, uint16_t operand){
+    assert(0 && "not implemented");
+    return 0;
+}
+uint8_t op_txs(cpu_6502_t *cpu, uint16_t operand){
+    assert(0 && "not implemented");
+    return 0;
+}
+uint8_t op_tya(cpu_6502_t *cpu, uint16_t operand){
+    assert(0 && "not implemented");
+    return 0;
+}
+
+
+
 
 /* TODO: TEMPORARY */
 /* TODO: TEMPORARY */
