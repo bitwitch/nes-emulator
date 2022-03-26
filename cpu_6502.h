@@ -6,7 +6,6 @@
 typedef struct {
     uint8_t a, x, y, sp, status;
     uint16_t pc;
-    uint16_t initial_pc;
     int cycle_counter, interrupt_period;
 } cpu_6502_t;
 
@@ -21,6 +20,7 @@ typedef enum {
 } status_mask_t;
 
 int run_6502(cpu_6502_t *cpu);
+void reset_6502(cpu_6502_t *cpu);
 
 uint8_t get_flag(cpu_6502_t *cpu, status_mask_t mask);
 
