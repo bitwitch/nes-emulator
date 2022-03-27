@@ -10,13 +10,13 @@ typedef struct {
 } cpu_6502_t;
 
 typedef enum {
-    STATUS_C = 1 << 0;
-    STATUS_Z = 1 << 1;
-    STATUS_I = 1 << 2;
-    STATUS_D = 1 << 3;
-    STATUS_B = 1 << 4;
-    STATUS_V = 1 << 6;
-    STATUS_N = 1 << 7;
+    STATUS_C = 1 << 0,
+    STATUS_Z = 1 << 1,
+    STATUS_I = 1 << 2,
+    STATUS_D = 1 << 3,
+    STATUS_B = 1 << 4,
+    STATUS_V = 1 << 6,
+    STATUS_N = 1 << 7
 } status_mask_t;
 
 int run_6502(cpu_6502_t *cpu);
