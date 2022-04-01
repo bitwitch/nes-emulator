@@ -6,7 +6,8 @@
 
 #define MAX_TOKENS 32
 
-void print_cpu_state(cpu_6502_t *cpu) {
+
+void print_cpu_state(cpu_t *cpu) {
     printf("PC\t\tA\t\tX\t\tY\t\tSP\t\tN V _ B D I Z C\n"); 
     printf("0x%.4X\t\t0x%.2X\t\t0x%.2X\t\t0x%.2X\t\t0x%2X\t\t%d %d %d %d %d %d %d %d\n", cpu->pc, cpu->a, cpu->x, cpu->y, cpu->sp, (cpu->status >> 7) & 1, (cpu->status >> 6) & 1, (cpu->status >> 5) & 1, (cpu->status >> 4) & 1, (cpu->status >> 3) & 1, (cpu->status >> 2) & 1, (cpu->status >> 1) & 1, (cpu->status >> 0) & 1);
 }
@@ -36,10 +37,11 @@ int get_command(char *command, size_t *len, char **tokens) {
 void print_usage(void) {
     printf("\n"
         "Commands:\n"
-        "(p)oke  address data\n"
-        "(d)ump  count address\n"
+        "(p)oke      address  data\n"
+        "(d)ump      count    address\n"
+        "(r)egister  name     data\n"
         "(s)tep\n"
-        "(r)un\n\n");
+        "(e)xecute\n\n");
 }
 
 uint16_t parse_address(char* str) {
@@ -63,7 +65,8 @@ uint8_t parse_data(char* str) {
     return data;
 }
 
-int execute_command(char **tokens) {
+/* returns zero normally and nonzero to signal quit */
+int execute_command(cpu_t *cpu, char **tokens) {
     char **current = tokens;
     char c = (*current)[0];
     ++current;
@@ -72,7 +75,7 @@ int execute_command(char **tokens) {
         case 'p':
         {
             if (*current == NULL || *(current+1) == NULL) {
-                printf("Error: must supply address and data\n");
+                printf("Error: must supply address and data to poke\n");
                 print_usage();
                 break;
             }
@@ -80,32 +83,65 @@ int execute_command(char **tokens) {
             uint16_t address = parse_address(*current++);
             uint8_t data = parse_data(*current++);
             printf("poke: address = %#X data = %#X\n", address, data);
+            write_address(address, data);
             break;
         }
 
         case 'd':
         {
             if (*current == NULL || *(current+1) == NULL) {
-                printf("Error: must supply count and address\n");
+                printf("Error: must supply count and address to dump\n");
                 print_usage();
                 break;
             }
 
             uint16_t count = (uint16_t)atoi(*current++);
-            uint16_t address = parse_address(*current++);
-            printf("dump: count = %d address = %#X\n", count, address);
+            uint16_t start = parse_address(*current++);
+            printf("\n");
+            for (uint16_t address = start; count > 0; --count, ++address) 
+                printf("0x%.4X\t\t0x%.2X\n", address, read_address(address));
+            printf("\n");
             break;
         }
-        
+
+        case 'r':
+        {
+            if (*current == NULL || *(current+1) == NULL) {
+                printf("Error: must supply register name and data to register\n");
+                print_usage();
+                break;
+            }
+
+            char reg = (*current++)[0];
+            uint8_t data = parse_data(*current++);
+
+            switch(reg) {
+                case 'a': cpu->a      = data; break;
+                case 'x': cpu->x      = data; break;
+                case 'y': cpu->y      = data; break;
+                case 's': cpu->sp     = data; break;
+                case 'p': cpu->status = data; break;
+                default: 
+                    printf("Invalid register name. Valid names include: a, x, y, sp, p (status)\n");
+                    break;
+            }
+            break;
+        }
+
         case 's':
             printf("step\n");
             break;
 
-        case 'r':
-            printf("run\n");
+        case 'e':
+            printf("execute\n");
             break;
 
+        case 'q':
+            printf("Exiting.\n");
+            return 1;
+
         default:
+            printf("Invalid command\n");
             print_usage();
             break;
     }
@@ -122,17 +158,15 @@ int execute_command(char **tokens) {
     execute command
 */
 int repl(void) {
-    int quit = 0;
-
-    cpu_6502_t cpu;
+    cpu_t cpu;
     reset_6502(&cpu);
 
     size_t command_size = 32;
     char *command = malloc(command_size * sizeof(char));
     char *tokens[MAX_TOKENS];
+    int quit = 0;
 
     while(!quit) {
-
         print_cpu_state(&cpu);
         printf("\n> ");
 
@@ -142,7 +176,7 @@ int repl(void) {
             return 1;
         }
 
-        execute_command(tokens);
+        quit = execute_command(&cpu, tokens);
     }
 
     free(command);

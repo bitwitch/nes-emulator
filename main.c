@@ -1,8 +1,7 @@
 #include <stdio.h>
 #include "cpu_6502.h"
+#include "memory.h"
 #include "repl.h"
-
-void init_memory(void);
 
 int main(int argc, char **argv) {
     (void)argc;
