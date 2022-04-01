@@ -7,7 +7,7 @@ typedef struct {
     uint8_t a, x, y, sp, status;
     uint16_t pc;
     int cycle_counter, interrupt_period;
-} cpu_6502_t;
+} cpu_t;
 
 typedef enum {
     STATUS_C = 1 << 0,
@@ -19,15 +19,15 @@ typedef enum {
     STATUS_N = 1 << 7
 } status_mask_t;
 
-int run_6502(cpu_6502_t *cpu);
-void reset_6502(cpu_6502_t *cpu);
+int run_6502(cpu_t *cpu);
+void reset_6502(cpu_t *cpu);
 
-uint8_t get_flag(cpu_6502_t *cpu, status_mask_t mask);
+uint8_t get_flag(cpu_t *cpu, status_mask_t mask);
 
 /*****************************************************************/
 /* These need to be defined by the system incorporating the 6502 */
 extern uint8_t read_address(uint16_t addr);
-extern void write_address(uint16_t addr);
+extern void write_address(uint16_t addr, uint8_t data);
 /*****************************************************************/
 
 #endif 

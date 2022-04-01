@@ -13,11 +13,11 @@ typedef union {
 } word_t;
 
 
-uint8_t get_flag(cpu_6502_t *cpu, status_mask_t mask) {
+uint8_t get_flag(cpu_t *cpu, status_mask_t mask) {
     return (cpu->status & mask) != 0;
 }
 
-void reset_6502(cpu_6502_t *cpu) {
+void reset_6502(cpu_t *cpu) {
     cpu->a = 0;
     cpu->x = 0;
     cpu->y = 0;
@@ -32,16 +32,16 @@ void reset_6502(cpu_6502_t *cpu) {
 /****************************************************************************/
 /* address modes */
 /****************************************************************************/
-uint8_t am_imp(cpu_6502_t *cpu) { (void)cpu; return 0; }
+uint8_t am_imp(cpu_t *cpu) { (void)cpu; return 0; }
 
-uint8_t am_abs(cpu_6502_t *cpu) {
+uint8_t am_abs(cpu_t *cpu) {
     word_t operand;
     operand.byte.l = read_address(cpu->pc++);
     operand.byte.h = read_address(cpu->pc++);
     return read_address(operand.w);
 }
 
-uint8_t am_abs_x(cpu_6502_t *cpu) {
+uint8_t am_abs_x(cpu_t *cpu) {
     word_t operand;
     operand.byte.l = read_address(cpu->pc++);
     operand.byte.h = read_address(cpu->pc++);
@@ -49,7 +49,7 @@ uint8_t am_abs_x(cpu_6502_t *cpu) {
     return read_address(operand.w);
 }
 
-uint8_t am_abs_y(cpu_6502_t *cpu) {
+uint8_t am_abs_y(cpu_t *cpu) {
     word_t operand;
     operand.byte.l = read_address(cpu->pc++);
     operand.byte.h = read_address(cpu->pc++);
@@ -57,11 +57,11 @@ uint8_t am_abs_y(cpu_6502_t *cpu) {
     return read_address(operand.w);
 }
 
-uint8_t am_imm(cpu_6502_t *cpu) {
+uint8_t am_imm(cpu_t *cpu) {
     return read_address(cpu->pc++);
 }
 
-uint8_t am_ind(cpu_6502_t *cpu) {
+uint8_t am_ind(cpu_t *cpu) {
     word_t operand, pointer;
     pointer.byte.l = read_address(cpu->pc++);
     pointer.byte.h = read_address(cpu->pc++);
@@ -70,7 +70,7 @@ uint8_t am_ind(cpu_6502_t *cpu) {
     return read_address(operand.w);
 }
 
-uint8_t am_x_ind(cpu_6502_t *cpu) {
+uint8_t am_x_ind(cpu_t *cpu) {
     word_t operand;
     uint8_t zpg = cpu->x + read_address(cpu->pc++);
     operand.byte.l = read_address(zpg);
@@ -79,7 +79,7 @@ uint8_t am_x_ind(cpu_6502_t *cpu) {
     return read_address(operand.w);
 }
 
-uint8_t am_ind_y(cpu_6502_t *cpu) {
+uint8_t am_ind_y(cpu_t *cpu) {
     word_t operand;
     uint8_t zpg = read_address(cpu->pc++);
     uint16_t sum = cpu->y + read_address(zpg);
@@ -89,7 +89,7 @@ uint8_t am_ind_y(cpu_6502_t *cpu) {
     return read_address(operand.w);
 }
 
-uint8_t am_rel(cpu_6502_t *cpu) {
+uint8_t am_rel(cpu_t *cpu) {
     /* NOTE: signed offset */
     int8_t offset = read_address(cpu->pc++);
     return read_address(cpu->pc + offset);
@@ -97,16 +97,16 @@ uint8_t am_rel(cpu_6502_t *cpu) {
      * be added to execution */
 }
 
-uint8_t am_zpg(cpu_6502_t *cpu) {
+uint8_t am_zpg(cpu_t *cpu) {
     return read_address(read_address(cpu->pc++));
 }
 
-uint8_t am_zpg_x(cpu_6502_t *cpu) {
+uint8_t am_zpg_x(cpu_t *cpu) {
     uint8_t operand = cpu->x + read_address(cpu->pc++);
     return read_address(operand);
 }
 
-uint8_t am_zpg_y(cpu_6502_t *cpu) {
+uint8_t am_zpg_y(cpu_t *cpu) {
     uint8_t operand = cpu->y + read_address(cpu->pc++);
     return read_address(operand);
 }
@@ -114,7 +114,7 @@ uint8_t am_zpg_y(cpu_6502_t *cpu) {
 /****************************************************************************/
 /* operations */
 /****************************************************************************/
-uint8_t op_adc(cpu_6502_t *cpu, uint8_t operand) {
+uint8_t op_adc(cpu_t *cpu, uint8_t operand) {
     int same_sign = (cpu->a >> 7) == (operand >> 7);
     uint16_t temp = cpu->a + operand + get_flag(cpu, STATUS_C);
     cpu->a = temp & 0xFF;
@@ -129,284 +129,284 @@ uint8_t op_adc(cpu_6502_t *cpu, uint8_t operand) {
     return 0;
 }
 
-uint8_t op_and(cpu_6502_t *cpu, uint8_t operand){
+uint8_t op_and(cpu_t *cpu, uint8_t operand){
     (void)cpu; (void)operand;
     assert(0 && "not implemented");
     return 0;
 }
-uint8_t op_asl(cpu_6502_t *cpu, uint8_t operand){
+uint8_t op_asl(cpu_t *cpu, uint8_t operand){
     (void)cpu; (void)operand;
     assert(0 && "not implemented");
     return 0;
 }
-uint8_t op_bcc(cpu_6502_t *cpu, uint8_t operand){
+uint8_t op_bcc(cpu_t *cpu, uint8_t operand){
     (void)cpu; (void)operand;
     assert(0 && "not implemented");
     return 0;
 }
-uint8_t op_bcs(cpu_6502_t *cpu, uint8_t operand){
+uint8_t op_bcs(cpu_t *cpu, uint8_t operand){
     (void)cpu; (void)operand;
     assert(0 && "not implemented");
     return 0;
 }
-uint8_t op_beq(cpu_6502_t *cpu, uint8_t operand){
+uint8_t op_beq(cpu_t *cpu, uint8_t operand){
     (void)cpu; (void)operand;
     assert(0 && "not implemented");
     return 0;
 }
-uint8_t op_bit(cpu_6502_t *cpu, uint8_t operand){
+uint8_t op_bit(cpu_t *cpu, uint8_t operand){
     (void)cpu; (void)operand;
     assert(0 && "not implemented");
     return 0;
 }
-uint8_t op_bmi(cpu_6502_t *cpu, uint8_t operand){
+uint8_t op_bmi(cpu_t *cpu, uint8_t operand){
     (void)cpu; (void)operand;
     assert(0 && "not implemented");
     return 0;
 }
-uint8_t op_bne(cpu_6502_t *cpu, uint8_t operand){
+uint8_t op_bne(cpu_t *cpu, uint8_t operand){
     (void)cpu; (void)operand;
     assert(0 && "not implemented");
     return 0;
 }
-uint8_t op_bpl(cpu_6502_t *cpu, uint8_t operand){
+uint8_t op_bpl(cpu_t *cpu, uint8_t operand){
     (void)cpu; (void)operand;
     assert(0 && "not implemented");
     return 0;
 }
-uint8_t op_brk(cpu_6502_t *cpu, uint8_t operand){
+uint8_t op_brk(cpu_t *cpu, uint8_t operand){
     (void)cpu; (void)operand;
     assert(0 && "not implemented");
     return 0;
 }
-uint8_t op_bvc(cpu_6502_t *cpu, uint8_t operand){
+uint8_t op_bvc(cpu_t *cpu, uint8_t operand){
     (void)cpu; (void)operand;
     assert(0 && "not implemented");
     return 0;
 }
-uint8_t op_bvs(cpu_6502_t *cpu, uint8_t operand){
+uint8_t op_bvs(cpu_t *cpu, uint8_t operand){
     (void)cpu; (void)operand;
     assert(0 && "not implemented");
     return 0;
 }
-uint8_t op_clc(cpu_6502_t *cpu, uint8_t operand){
+uint8_t op_clc(cpu_t *cpu, uint8_t operand){
     (void)cpu; (void)operand;
     assert(0 && "not implemented");
     return 0;
 }
-uint8_t op_cld(cpu_6502_t *cpu, uint8_t operand){
+uint8_t op_cld(cpu_t *cpu, uint8_t operand){
     (void)cpu; (void)operand;
     assert(0 && "not implemented");
     return 0;
 }
-uint8_t op_cli(cpu_6502_t *cpu, uint8_t operand){
+uint8_t op_cli(cpu_t *cpu, uint8_t operand){
     (void)cpu; (void)operand;
     assert(0 && "not implemented");
     return 0;
 }
-uint8_t op_clv(cpu_6502_t *cpu, uint8_t operand){
+uint8_t op_clv(cpu_t *cpu, uint8_t operand){
     (void)cpu; (void)operand;
     assert(0 && "not implemented");
     return 0;
 }
-uint8_t op_cmp(cpu_6502_t *cpu, uint8_t operand){
+uint8_t op_cmp(cpu_t *cpu, uint8_t operand){
     (void)cpu; (void)operand;
     assert(0 && "not implemented");
     return 0;
 }
-uint8_t op_cpx(cpu_6502_t *cpu, uint8_t operand){
+uint8_t op_cpx(cpu_t *cpu, uint8_t operand){
     (void)cpu; (void)operand;
     assert(0 && "not implemented");
     return 0;
 }
-uint8_t op_cpy(cpu_6502_t *cpu, uint8_t operand){
+uint8_t op_cpy(cpu_t *cpu, uint8_t operand){
     (void)cpu; (void)operand;
     assert(0 && "not implemented");
     return 0;
 }
-uint8_t op_dec(cpu_6502_t *cpu, uint8_t operand){
+uint8_t op_dec(cpu_t *cpu, uint8_t operand){
     (void)cpu; (void)operand;
     assert(0 && "not implemented");
     return 0;
 }
-uint8_t op_dex(cpu_6502_t *cpu, uint8_t operand){
+uint8_t op_dex(cpu_t *cpu, uint8_t operand){
     (void)cpu; (void)operand;
     assert(0 && "not implemented");
     return 0;
 }
-uint8_t op_dey(cpu_6502_t *cpu, uint8_t operand){
+uint8_t op_dey(cpu_t *cpu, uint8_t operand){
     (void)cpu; (void)operand;
     assert(0 && "not implemented");
     return 0;
 }
-uint8_t op_eor(cpu_6502_t *cpu, uint8_t operand){
+uint8_t op_eor(cpu_t *cpu, uint8_t operand){
     (void)cpu; (void)operand;
     assert(0 && "not implemented");
     return 0;
 }
-uint8_t op_inc(cpu_6502_t *cpu, uint8_t operand){
+uint8_t op_inc(cpu_t *cpu, uint8_t operand){
     (void)cpu; (void)operand;
     assert(0 && "not implemented");
     return 0;
 }
-uint8_t op_inx(cpu_6502_t *cpu, uint8_t operand){
+uint8_t op_inx(cpu_t *cpu, uint8_t operand){
     (void)cpu; (void)operand;
     assert(0 && "not implemented");
     return 0;
 }
-uint8_t op_iny(cpu_6502_t *cpu, uint8_t operand){
+uint8_t op_iny(cpu_t *cpu, uint8_t operand){
     (void)cpu; (void)operand;
     assert(0 && "not implemented");
     return 0;
 }
-uint8_t op_jmp(cpu_6502_t *cpu, uint8_t operand){
+uint8_t op_jmp(cpu_t *cpu, uint8_t operand){
     (void)cpu; (void)operand;
     assert(0 && "not implemented");
     return 0;
 }
-uint8_t op_jsr(cpu_6502_t *cpu, uint8_t operand){
+uint8_t op_jsr(cpu_t *cpu, uint8_t operand){
     (void)cpu; (void)operand;
     assert(0 && "not implemented");
     return 0;
 }
-uint8_t op_lda(cpu_6502_t *cpu, uint8_t operand){
+uint8_t op_lda(cpu_t *cpu, uint8_t operand){
     (void)cpu; (void)operand;
     assert(0 && "not implemented");
     return 0;
 }
-uint8_t op_ldx(cpu_6502_t *cpu, uint8_t operand){
+uint8_t op_ldx(cpu_t *cpu, uint8_t operand){
     (void)cpu; (void)operand;
     assert(0 && "not implemented");
     return 0;
 }
-uint8_t op_ldy(cpu_6502_t *cpu, uint8_t operand){
+uint8_t op_ldy(cpu_t *cpu, uint8_t operand){
     (void)cpu; (void)operand;
     assert(0 && "not implemented");
     return 0;
 }
-uint8_t op_lsr(cpu_6502_t *cpu, uint8_t operand){
+uint8_t op_lsr(cpu_t *cpu, uint8_t operand){
     (void)cpu; (void)operand;
     assert(0 && "not implemented");
     return 0;
 }
-uint8_t op_nop(cpu_6502_t *cpu, uint8_t operand){
+uint8_t op_nop(cpu_t *cpu, uint8_t operand){
     (void)cpu; (void)operand;
     assert(0 && "not implemented");
     return 0;
 }
-uint8_t op_ora(cpu_6502_t *cpu, uint8_t operand){
+uint8_t op_ora(cpu_t *cpu, uint8_t operand){
     (void)cpu; (void)operand;
     assert(0 && "not implemented");
     return 0;
 }
-uint8_t op_pha(cpu_6502_t *cpu, uint8_t operand){
+uint8_t op_pha(cpu_t *cpu, uint8_t operand){
     (void)cpu; (void)operand;
     assert(0 && "not implemented");
     return 0;
 }
-uint8_t op_php(cpu_6502_t *cpu, uint8_t operand){
+uint8_t op_php(cpu_t *cpu, uint8_t operand){
     (void)cpu; (void)operand;
     assert(0 && "not implemented");
     return 0;
 }
-uint8_t op_pla(cpu_6502_t *cpu, uint8_t operand){
+uint8_t op_pla(cpu_t *cpu, uint8_t operand){
     (void)cpu; (void)operand;
     assert(0 && "not implemented");
     return 0;
 }
-uint8_t op_plp(cpu_6502_t *cpu, uint8_t operand){
+uint8_t op_plp(cpu_t *cpu, uint8_t operand){
     (void)cpu; (void)operand;
     assert(0 && "not implemented");
     return 0;
 }
-uint8_t op_rol(cpu_6502_t *cpu, uint8_t operand){
+uint8_t op_rol(cpu_t *cpu, uint8_t operand){
     (void)cpu; (void)operand;
     assert(0 && "not implemented");
     return 0;
 }
-uint8_t op_ror(cpu_6502_t *cpu, uint8_t operand){
+uint8_t op_ror(cpu_t *cpu, uint8_t operand){
     (void)cpu; (void)operand;
     assert(0 && "not implemented");
     return 0;
 }
-uint8_t op_rti(cpu_6502_t *cpu, uint8_t operand){
+uint8_t op_rti(cpu_t *cpu, uint8_t operand){
     (void)cpu; (void)operand;
     assert(0 && "not implemented");
     return 0;
 }
-uint8_t op_rts(cpu_6502_t *cpu, uint8_t operand){
+uint8_t op_rts(cpu_t *cpu, uint8_t operand){
     (void)cpu; (void)operand;
     assert(0 && "not implemented");
     return 0;
 }
-uint8_t op_sbc(cpu_6502_t *cpu, uint8_t operand){
+uint8_t op_sbc(cpu_t *cpu, uint8_t operand){
     (void)cpu; (void)operand;
     assert(0 && "not implemented");
     return 0;
 }
-uint8_t op_sec(cpu_6502_t *cpu, uint8_t operand){
+uint8_t op_sec(cpu_t *cpu, uint8_t operand){
     (void)cpu; (void)operand;
     assert(0 && "not implemented");
     return 0;
 }
-uint8_t op_sed(cpu_6502_t *cpu, uint8_t operand){
+uint8_t op_sed(cpu_t *cpu, uint8_t operand){
     (void)cpu; (void)operand;
     assert(0 && "not implemented");
     return 0;
 }
-uint8_t op_sei(cpu_6502_t *cpu, uint8_t operand){
+uint8_t op_sei(cpu_t *cpu, uint8_t operand){
     (void)cpu; (void)operand;
     assert(0 && "not implemented");
     return 0;
 }
-uint8_t op_sta(cpu_6502_t *cpu, uint8_t operand){
+uint8_t op_sta(cpu_t *cpu, uint8_t operand){
     (void)cpu; (void)operand;
     assert(0 && "not implemented");
     return 0;
 }
-uint8_t op_stx(cpu_6502_t *cpu, uint8_t operand){
+uint8_t op_stx(cpu_t *cpu, uint8_t operand){
     (void)cpu; (void)operand;
     assert(0 && "not implemented");
     return 0;
 }
-uint8_t op_sty(cpu_6502_t *cpu, uint8_t operand){
+uint8_t op_sty(cpu_t *cpu, uint8_t operand){
     (void)cpu; (void)operand;
     assert(0 && "not implemented");
     return 0;
 }
-uint8_t op_tax(cpu_6502_t *cpu, uint8_t operand){
+uint8_t op_tax(cpu_t *cpu, uint8_t operand){
     (void)cpu; (void)operand;
     assert(0 && "not implemented");
     return 0;
 }
-uint8_t op_tay(cpu_6502_t *cpu, uint8_t operand){
+uint8_t op_tay(cpu_t *cpu, uint8_t operand){
     (void)cpu; (void)operand;
     assert(0 && "not implemented");
     return 0;
 }
-uint8_t op_tsx(cpu_6502_t *cpu, uint8_t operand){
+uint8_t op_tsx(cpu_t *cpu, uint8_t operand){
     (void)cpu; (void)operand;
     assert(0 && "not implemented");
     return 0;
 }
-uint8_t op_txa(cpu_6502_t *cpu, uint8_t operand){
+uint8_t op_txa(cpu_t *cpu, uint8_t operand){
     (void)cpu; (void)operand;
     assert(0 && "not implemented");
     return 0;
 }
-uint8_t op_txs(cpu_6502_t *cpu, uint8_t operand){
+uint8_t op_txs(cpu_t *cpu, uint8_t operand){
     (void)cpu; (void)operand;
     assert(0 && "not implemented");
     return 0;
 }
-uint8_t op_tya(cpu_6502_t *cpu, uint8_t operand){
+uint8_t op_tya(cpu_t *cpu, uint8_t operand){
     (void)cpu; (void)operand;
     assert(0 && "not implemented");
     return 0;
 }
 
 
-uint8_t op_xxx(cpu_6502_t *cpu, uint8_t operand) {
+uint8_t op_xxx(cpu_t *cpu, uint8_t operand) {
     (void)cpu; 
     (void)operand;
     printf("Illegal opcode used\n");
@@ -419,7 +419,7 @@ uint8_t op_xxx(cpu_6502_t *cpu, uint8_t operand) {
 /* TODO: TEMPORARY */
 int exit_required = 0;
 
-int run_6502(cpu_6502_t *cpu) {
+int run_6502(cpu_t *cpu) {
     reset_6502(cpu);
 
     uint8_t opcode;
