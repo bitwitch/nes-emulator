@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "cpu_6502.h"
+#include "ops.h"
 
 #define MAX_TOKENS 32
 
@@ -131,6 +132,10 @@ int execute_command(cpu_t *cpu, char **tokens) {
 
         case 's':
             printf("step\n");
+            uint8_t opcode = read_address(cpu->pc++);
+            op_t op = ops[opcode];
+            uint16_t addr = op.addr_mode(cpu);
+            op.execute(cpu, addr);
             break;
 
         case 'e':
@@ -151,6 +156,38 @@ int execute_command(cpu_t *cpu, char **tokens) {
 }
 
 
+void init_test_asm(void) {
+    write_address(0xC000, 0xA9); /* lda #$69 */
+    write_address(0xC001, 0x69); 
+    write_address(0xC002, 0x85); /* sta $03 */
+    write_address(0xC003, 0x03);
+
+    write_address(0xC004, 0xA2); /* ldx #$42 */
+    write_address(0xC005, 0x42); 
+    write_address(0xC006, 0x86); /* stx $06 */
+    write_address(0xC007, 0x06);
+
+    write_address(0xC008, 0xA0); /* ldy #$F3 */
+    write_address(0xC009, 0xF3); 
+    write_address(0xC00A, 0x84); /* sty $09 */
+    write_address(0xC00B, 0x09);
+
+    write_address(0xC00C, 0x4C); /* jmp $C069 */
+    write_address(0xC00D, 0x69);
+    write_address(0xC00E, 0xC0);
+
+    write_address(0xC069, 0xAA); /* tax */
+    write_address(0xC06A, 0xA8); /* tay */
+    write_address(0xC06B, 0xBA); /* tsx */
+    write_address(0xC06C, 0x8A); /* txa */
+
+    write_address(0xC06D, 0xA2); /* ldx #$42 */
+    write_address(0xC06E, 0x42); 
+    write_address(0xC06F, 0x9A); /* txs */
+
+    write_address(0xC070, 0x98); /* tya */
+}
+
 
 /*
     print cpu state
@@ -166,6 +203,8 @@ int repl(void) {
     char *command = malloc(command_size * sizeof(char));
     char *tokens[MAX_TOKENS];
     int quit = 0;
+
+    init_test_asm();
 
     while(!quit) {
         print_cpu_state(&cpu);

@@ -10,19 +10,20 @@ typedef struct {
 } cpu_t;
 
 typedef enum {
-    STATUS_C = 1 << 0,
-    STATUS_Z = 1 << 1,
-    STATUS_I = 1 << 2,
-    STATUS_D = 1 << 3,
-    STATUS_B = 1 << 4,
-    STATUS_V = 1 << 6,
-    STATUS_N = 1 << 7
-} status_mask_t;
+    STATUS_C = 0,
+    STATUS_Z = 1,
+    STATUS_I = 2,
+    STATUS_D = 3,
+    STATUS_B = 4,
+    STATUS_V = 6,
+    STATUS_N = 7
+} status_bit_t;
 
 int run_6502(cpu_t *cpu);
 void reset_6502(cpu_t *cpu);
 
-uint8_t get_flag(cpu_t *cpu, status_mask_t mask);
+uint8_t get_flag(cpu_t *cpu, status_bit_t sbit);
+void set_flag(cpu_t *cpu, status_bit_t sbit, int value);
 
 /*****************************************************************/
 /* These need to be defined by the system incorporating the 6502 */
