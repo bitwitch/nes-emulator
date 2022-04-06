@@ -41,7 +41,8 @@ void print_usage(void) {
         "(d)ump      count    address\n"
         "(r)egister  name     data\n"
         "(s)tep\n"
-        "(e)xecute\n\n");
+        "(e)xecute\n"
+        "(q)uit\n\n");
 }
 
 uint16_t parse_address(char* str) {
