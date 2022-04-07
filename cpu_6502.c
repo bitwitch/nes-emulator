@@ -18,17 +18,6 @@ uint8_t get_flag(cpu_t *cpu, status_bit_t sbit) {
     return (cpu->status & mask) != 0;
 }
 
-
-/*
-
-
-0101
-0100
-
- 0
-
-*/
-
 void set_flag(cpu_t *cpu, status_bit_t sbit, int value) {
     assert(value == 0 || value == 1);
     uint8_t mask = 1 << sbit;
@@ -41,6 +30,10 @@ void reset_6502(cpu_t *cpu) {
     cpu->y = 0;
     cpu->sp = 0xFF;
     cpu->status = 1 << 5;
+
+    /* TODO(shaw): the reset vector is 0xFFFC, 0xFFFD on startup the cpu would
+     * read the values at these locations into pc and perform a JMP. For now
+     * i'm just hardcoding the pc to a value */
 
     /*cpu->pc = 0xFFFC;*/
     cpu->pc = 0xC000;
