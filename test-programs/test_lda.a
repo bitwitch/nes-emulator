@@ -1,6 +1,50 @@
-LDA #$01
-STA $0200
-LDA #$05
-STA $0201
-LDA #$08
-STA $0202
+; immediate
+LDA #1
+STA $0000
+LDA #2
+STA $0001
+LDA #3
+STA $0002
+
+; zeropage
+LDA $00
+STA $0003
+
+; zeropage,X
+LDX #1
+LDA $00,X
+STA $0004
+
+; zeropage,Y
+LDY #2
+LDA $00,Y
+STA $0005
+
+; absolute
+LDA $0000
+STA $0006
+
+; absolute,X
+LDA $0000,X
+STA $0007
+
+; absolute,Y
+LDA $0000,Y
+STA $0008
+
+; (indirect,X)
+LDA #3
+STA $00F0
+LDA #0
+STA $00F1
+LDA ($EF,X)
+STA $0009
+
+; (indirect),Y
+LDA #5
+STA $00F2
+LDA #0
+STA $00F3
+LDA ($F2),Y
+STA $000A
+

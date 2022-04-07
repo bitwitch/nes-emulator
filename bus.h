@@ -1,5 +1,5 @@
-#ifndef __MEMORY_H
-#define __MEMORY_H
+#ifndef __BUS_H
+#define __BUS_H
 
 #include <stdint.h>
 

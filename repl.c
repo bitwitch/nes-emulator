@@ -2,9 +2,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include "memory.h"
+#include "bus.h"
 #include "cpu_6502.h"
-#include "ops.h"
 
 #define MAX_TOKENS 32
 
@@ -83,7 +82,7 @@ int execute_command(cpu_t *cpu, char **tokens) {
             uint16_t address = parse_address(*current++);
             uint8_t data = parse_data(*current++);
             printf("poke: address = %#X data = %#X\n", address, data);
-            write_address(address, data);
+            bus_write(address, data);
             break;
         }
 
@@ -100,7 +99,7 @@ int execute_command(cpu_t *cpu, char **tokens) {
             uint16_t start = parse_address(*current++);
             printf("\n");
             for (uint16_t address = start; count > 0; --count, ++address) 
-                printf("0x%.4X\t\t0x%.2X\n", address, read_address(address));
+                printf("0x%.4X\t\t0x%.2X\n", address, bus_read(address));
             printf("\n");
             break;
         }
@@ -186,24 +185,15 @@ int execute_command(cpu_t *cpu, char **tokens) {
         case 's':
         {
             printf("step\n");
-            uint8_t opcode = read_address(cpu->pc++);
-            op_t op = ops[opcode];
-            uint16_t addr = op.addr_mode(cpu);
-            op.execute(cpu, addr);
+            cpu_tick(cpu);
             break;
         }
 
         /* execute */
         case 'e':
         {
-            while(1) {
-                uint8_t opcode = read_address(cpu->pc++);
-                op_t op = ops[opcode];
-                if (0 == strcmp(op.name, "BRK"))
-                    break;
-                uint16_t addr = op.addr_mode(cpu);
-                op.execute(cpu, addr);
-            }
+            printf("execute\n");
+            cpu_run(cpu);
             break;
         }
 
@@ -223,38 +213,38 @@ int execute_command(cpu_t *cpu, char **tokens) {
 
 
 void init_test_asm(void) {
-    write_address(0xC000, 0xA9); /* lda #$69 */
-    write_address(0xC001, 0x69); 
+    bus_write(0xC000, 0xA9); /* lda #$69 */
+    bus_write(0xC001, 0x69); 
 
-    write_address(0xC002, 0x85); /* sta $03 */
-    write_address(0xC003, 0x03);
+    bus_write(0xC002, 0x85); /* sta $03 */
+    bus_write(0xC003, 0x03);
 
-    write_address(0xC004, 0xA2); /* ldx #$42 */
-    write_address(0xC005, 0x01); 
+    bus_write(0xC004, 0xA2); /* ldx #$42 */
+    bus_write(0xC005, 0x01); 
 
-    write_address(0xC006, 0x85); /* sta $03 */
-    write_address(0xC007, 0x03);
-
-
+    bus_write(0xC006, 0x85); /* sta $03 */
+    bus_write(0xC007, 0x03);
 
 
 
 
 
 
-    /*write_address(0xC004, 0xA2); [> ldx #$42 <]*/
-    /*write_address(0xC005, 0x42); */
-    /*write_address(0xC006, 0x86); [> stx $06 <]*/
-    /*write_address(0xC007, 0x06);*/
 
-    /*write_address(0xC008, 0xA0); [> ldy #$F3 <]*/
-    /*write_address(0xC009, 0xF3); */
-    /*write_address(0xC00A, 0x84); [> sty $09 <]*/
-    /*write_address(0xC00B, 0x09);*/
 
-    /*write_address(0xC00C, 0x4C); [> jmp $C069 <]*/
-    /*write_address(0xC00D, 0x69);*/
-    /*write_address(0xC00E, 0xC0);*/
+    /*bus_write(0xC004, 0xA2); [> ldx #$42 <]*/
+    /*bus_write(0xC005, 0x42); */
+    /*bus_write(0xC006, 0x86); [> stx $06 <]*/
+    /*bus_write(0xC007, 0x06);*/
+
+    /*bus_write(0xC008, 0xA0); [> ldy #$F3 <]*/
+    /*bus_write(0xC009, 0xF3); */
+    /*bus_write(0xC00A, 0x84); [> sty $09 <]*/
+    /*bus_write(0xC00B, 0x09);*/
+
+    /*bus_write(0xC00C, 0x4C); [> jmp $C069 <]*/
+    /*bus_write(0xC00D, 0x69);*/
+    /*bus_write(0xC00E, 0xC0);*/
 
 }
 
@@ -267,7 +257,7 @@ void init_test_asm(void) {
 */
 int repl(void) {
     cpu_t cpu;
-    reset_6502(&cpu);
+    cpu_reset(&cpu);
 
     size_t command_size = 32;
     char *command = malloc(command_size * sizeof(char));

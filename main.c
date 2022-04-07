@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include "cpu_6502.h"
-#include "memory.h"
+#include "bus.h"
 #include "repl.h"
 
 int main(int argc, char **argv) {

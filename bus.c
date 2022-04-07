@@ -20,11 +20,11 @@ void load_memory(uint16_t addr, uint8_t *data, uint16_t size) {
     memcpy(&memory[addr], data, size);
 }
 
-uint8_t read_address(uint16_t addr) {
+uint8_t bus_read(uint16_t addr) {
     return memory[addr];
 }
 
-void write_address(uint16_t addr, uint8_t data) {
+void bus_write(uint16_t addr, uint8_t data) {
     memory[addr] = data;
 }
 

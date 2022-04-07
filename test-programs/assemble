@@ -1,0 +1,3 @@
+#!/bin/bash
+
+acme --setpc 0xc000 --cpu 6502 -o $1.o $1.a
