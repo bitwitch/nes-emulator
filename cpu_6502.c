@@ -348,9 +348,20 @@ uint8_t op_rts(cpu_t *cpu, uint16_t addr){
     assert(0 && "not implemented");
     return 0;
 }
-uint8_t op_sbc(cpu_t *cpu, uint16_t addr){
-    (void)cpu; (void)addr;
-    assert(0 && "not implemented");
+
+uint8_t op_sbc(cpu_t *cpu, uint16_t addr) {
+    uint8_t operand = bus_read(addr);
+    uint8_t same_sign = (cpu->a & 0x80) == ((~operand) & 0x80);
+    uint8_t carry = get_flag(cpu, STATUS_C);
+    uint16_t temp = cpu->a + ~operand + carry;
+    uint8_t set_carry = cpu->a >= operand - !carry;
+    cpu->a = temp & 0xFF;
+    uint8_t overflow = same_sign && (cpu->a & 0x80) != ((~operand) & 0x80);
+
+    set_flag(cpu, STATUS_C, set_carry);
+    set_flag(cpu, STATUS_Z, cpu->a == 0);
+    set_flag(cpu, STATUS_N, cpu->a >> 7);
+    set_flag(cpu, STATUS_V, overflow);
     return 0;
 }
 

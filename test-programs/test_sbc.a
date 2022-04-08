@@ -1,0 +1,17 @@
+SEC      ; 0 - 1 = -1, returns V = 0
+LDA #$00
+SBC #$01
+
+SEC      ; -128 - 1 = -129, returns V = 1
+LDA #$80
+SBC #$01
+
+SEC      ; 127 - -1 = 128, returns V = 1
+LDA #$7F
+SBC #$FF
+
+SEC      ; 0xd0 - 0x70 = 0x160, returns 0x60 and V = 1  
+LDA #$D0
+SBC #$70
+
+
