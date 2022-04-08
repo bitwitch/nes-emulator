@@ -118,8 +118,7 @@ uint8_t op_adc(cpu_t *cpu, uint16_t addr) {
     cpu->a = temp & 0xFF;
     uint8_t overflow = same_sign && (cpu->a >> 7) != (operand >> 7);
 
-
-    set_flag(cpu, STATUS_C, (temp >> 8) != 0);
+    set_flag(cpu, STATUS_C, (temp & 0x100) >> 8);
     set_flag(cpu, STATUS_Z, cpu->a == 0);
     set_flag(cpu, STATUS_N, cpu->a >> 7);
     set_flag(cpu, STATUS_V, overflow);
@@ -189,11 +188,13 @@ uint8_t op_bvs(cpu_t *cpu, uint16_t addr){
     assert(0 && "not implemented");
     return 0;
 }
-uint8_t op_clc(cpu_t *cpu, uint16_t addr){
-    (void)cpu; (void)addr;
-    assert(0 && "not implemented");
+
+uint8_t op_clc(cpu_t *cpu, uint16_t addr) {
+    (void)addr;
+    set_flag(cpu, STATUS_C, 0);
     return 0;
 }
+
 uint8_t op_cld(cpu_t *cpu, uint16_t addr){
     (void)cpu; (void)addr;
     assert(0 && "not implemented");
@@ -352,11 +353,13 @@ uint8_t op_sbc(cpu_t *cpu, uint16_t addr){
     assert(0 && "not implemented");
     return 0;
 }
-uint8_t op_sec(cpu_t *cpu, uint16_t addr){
-    (void)cpu; (void)addr;
-    assert(0 && "not implemented");
+
+uint8_t op_sec(cpu_t *cpu, uint16_t addr) {
+    (void)addr;
+    set_flag(cpu, STATUS_C, 1);
     return 0;
 }
+
 uint8_t op_sed(cpu_t *cpu, uint16_t addr){
     (void)cpu; (void)addr;
     assert(0 && "not implemented");

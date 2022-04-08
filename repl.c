@@ -66,6 +66,10 @@ uint8_t parse_data(char* str) {
 /* returns zero normally and nonzero to signal quit */
 int execute_command(cpu_t *cpu, char **tokens) {
     char **current = tokens;
+
+    if (*current == NULL)
+        return 0;
+
     char c = (*current)[0];
     ++current;
 
@@ -259,10 +263,11 @@ int repl(void) {
     cpu_t cpu;
     cpu_reset(&cpu);
 
-    size_t command_size = 32;
+    size_t command_size = 64;
     char *command = malloc(command_size * sizeof(char));
     char *tokens[MAX_TOKENS];
     int quit = 0;
+    int rc = 0;
 
     /*init_test_asm();*/
 
@@ -272,8 +277,8 @@ int repl(void) {
 
         if (get_command(command, &command_size, tokens) < 0) {
             fprintf(stderr, "Error: failed to read command: %s\n", strerror(errno));
-            free(command);
-            return 1;
+            rc = 1;
+            break;
         }
 
         quit = execute_command(&cpu, tokens);
@@ -281,7 +286,7 @@ int repl(void) {
 
     free(command);
 
-    return 0;
+    return rc;
 }
 
 

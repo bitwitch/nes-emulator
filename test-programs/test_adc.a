@@ -1,0 +1,84 @@
+; add 2 signed positive numbers with overflow
+LDA #127
+ADC #2
+
+; add postive and negative, with positive result
+LDA #5
+ADC #-3
+CLC
+
+; add postive and negative, with negative result
+LDA #-7
+ADC #5
+
+; add 2 negative numbers without overflow
+LDA #-7
+ADC #-5
+CLC
+
+; add 2 negative numbers without overflow
+LDA #-66
+ADC #-65
+
+; add 2 numbers, resulting in carry
+LDA #$80
+STA $01
+ADC $01
+
+
+; adding two 16 bit numbers, no carry from low order add
+
+; first number = 258
+LDA #2
+STA $00
+LDA #1
+STA $01
+
+; second number = 4112
+LDA #$10
+STA $02
+STA $03
+
+LDA $00
+CLC
+ADC $02
+STA $04
+
+LDA $01
+ADC $03
+STA $05
+
+; $0004: $12
+; $0005: $11
+; sum = 4730
+
+
+; adding two 16 bit numbers, with carry from low order add
+
+; first number = 384
+LDA #$80
+STA $06
+LDA #$01
+STA $07
+
+; second number = 128
+LDA #$80
+STA $08
+LDA #$00
+STA $09
+
+LDA $06
+CLC
+ADC $08
+STA $0A
+
+LDA $07
+ADC $09
+STA $0B
+
+; $000A: $00
+; $000B: $02
+; sum = 512
+
+
+
