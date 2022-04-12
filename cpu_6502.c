@@ -135,39 +135,64 @@ uint8_t op_asl(cpu_t *cpu, uint16_t addr){
     assert(0 && "not implemented");
     return 0;
 }
-uint8_t op_bcc(cpu_t *cpu, uint16_t addr){
-    (void)cpu; (void)addr;
-    assert(0 && "not implemented");
+
+uint8_t op_bcc(cpu_t *cpu, uint16_t addr) {
+    cpu->pc = get_flag(cpu, STATUS_C) ? cpu->pc : addr;
+    /* TODO(shaw): 
+     * add 1 to cycles if branch occurs on same page
+     * add 2 to cycles if branch occurs to different page
+     */
     return 0;
 }
-uint8_t op_bcs(cpu_t *cpu, uint16_t addr){
-    (void)cpu; (void)addr;
-    assert(0 && "not implemented");
+
+uint8_t op_bcs(cpu_t *cpu, uint16_t addr) {
+    cpu->pc = get_flag(cpu, STATUS_C) ? addr : cpu->pc;
+    /* TODO(shaw): 
+     * add 1 to cycles if branch occurs on same page
+     * add 2 to cycles if branch occurs to different page
+     */
     return 0;
 }
-uint8_t op_beq(cpu_t *cpu, uint16_t addr){
-    (void)cpu; (void)addr;
-    assert(0 && "not implemented");
+
+uint8_t op_beq(cpu_t *cpu, uint16_t addr) {
+    cpu->pc = get_flag(cpu, STATUS_Z) ? addr : cpu->pc;
+    /* TODO(shaw): 
+     * add 1 to cycles if branch occurs on same page
+     * add 2 to cycles if branch occurs to different page
+     */
     return 0;
 }
+
 uint8_t op_bit(cpu_t *cpu, uint16_t addr){
     (void)cpu; (void)addr;
     assert(0 && "not implemented");
     return 0;
 }
-uint8_t op_bmi(cpu_t *cpu, uint16_t addr){
-    (void)cpu; (void)addr;
-    assert(0 && "not implemented");
+
+uint8_t op_bmi(cpu_t *cpu, uint16_t addr) {
+    cpu->pc = get_flag(cpu, STATUS_N) ? addr : cpu->pc;
+    /* TODO(shaw): 
+     * add 1 to cycles if branch occurs on same page
+     * add 2 to cycles if branch occurs to different page
+     */
     return 0;
 }
-uint8_t op_bne(cpu_t *cpu, uint16_t addr){
-    (void)cpu; (void)addr;
-    assert(0 && "not implemented");
+
+uint8_t op_bne(cpu_t *cpu, uint16_t addr) {
+    cpu->pc = get_flag(cpu, STATUS_Z) ? cpu->pc : addr;
+    /* TODO(shaw): 
+     * add 1 to cycles if branch occurs on same page
+     * add 2 to cycles if branch occurs to different page
+     */
     return 0;
 }
-uint8_t op_bpl(cpu_t *cpu, uint16_t addr){
-    (void)cpu; (void)addr;
-    assert(0 && "not implemented");
+
+uint8_t op_bpl(cpu_t *cpu, uint16_t addr) {
+    cpu->pc = get_flag(cpu, STATUS_N) ? cpu->pc : addr;
+    /* TODO(shaw): 
+     * add 1 to cycles if branch occurs on same page
+     * add 2 to cycles if branch occurs to different page
+     */
     return 0;
 }
 
@@ -178,14 +203,21 @@ uint8_t op_brk(cpu_t *cpu, uint16_t addr) {
     return 0;
 }
 
-uint8_t op_bvc(cpu_t *cpu, uint16_t addr){
-    (void)cpu; (void)addr;
-    assert(0 && "not implemented");
+uint8_t op_bvc(cpu_t *cpu, uint16_t addr) {
+    cpu->pc = get_flag(cpu, STATUS_V) ? cpu->pc : addr;
+    /* TODO(shaw): 
+     * add 1 to cycles if branch occurs on same page
+     * add 2 to cycles if branch occurs to different page
+     */
     return 0;
 }
-uint8_t op_bvs(cpu_t *cpu, uint16_t addr){
-    (void)cpu; (void)addr;
-    assert(0 && "not implemented");
+
+uint8_t op_bvs(cpu_t *cpu, uint16_t addr) {
+    cpu->pc = get_flag(cpu, STATUS_V) ? addr : cpu->pc;
+    /* TODO(shaw): 
+     * add 1 to cycles if branch occurs on same page
+     * add 2 to cycles if branch occurs to different page
+     */
     return 0;
 }
 
@@ -195,69 +227,102 @@ uint8_t op_clc(cpu_t *cpu, uint16_t addr) {
     return 0;
 }
 
-uint8_t op_cld(cpu_t *cpu, uint16_t addr){
-    (void)cpu; (void)addr;
-    assert(0 && "not implemented");
+uint8_t op_cld(cpu_t *cpu, uint16_t addr) {
+    (void)addr;
+    set_flag(cpu, STATUS_D, 0);
     return 0;
 }
-uint8_t op_cli(cpu_t *cpu, uint16_t addr){
-    (void)cpu; (void)addr;
-    assert(0 && "not implemented");
+
+uint8_t op_cli(cpu_t *cpu, uint16_t addr) {
+    (void)addr;
+    set_flag(cpu, STATUS_I, 0);
     return 0;
 }
-uint8_t op_clv(cpu_t *cpu, uint16_t addr){
-    (void)cpu; (void)addr;
-    assert(0 && "not implemented");
+
+uint8_t op_clv(cpu_t *cpu, uint16_t addr) {
+    (void)addr;
+    set_flag(cpu, STATUS_V, 0);
     return 0;
 }
-uint8_t op_cmp(cpu_t *cpu, uint16_t addr){
-    (void)cpu; (void)addr;
-    assert(0 && "not implemented");
+
+uint8_t op_cmp(cpu_t *cpu, uint16_t addr) {
+    uint8_t operand = bus_read(addr);
+    uint8_t result = cpu->a - operand;
+    set_flag(cpu, STATUS_C, cpu->a >= operand);
+    set_flag(cpu, STATUS_N, result >> 7);
+    set_flag(cpu, STATUS_Z, result == 0);
     return 0;
 }
-uint8_t op_cpx(cpu_t *cpu, uint16_t addr){
-    (void)cpu; (void)addr;
-    assert(0 && "not implemented");
+
+uint8_t op_cpx(cpu_t *cpu, uint16_t addr) {
+    uint8_t operand = bus_read(addr);
+    uint8_t result = cpu->x - operand;
+    set_flag(cpu, STATUS_C, cpu->x >= operand);
+    set_flag(cpu, STATUS_N, result >> 7);
+    set_flag(cpu, STATUS_Z, result == 0);
     return 0;
 }
-uint8_t op_cpy(cpu_t *cpu, uint16_t addr){
-    (void)cpu; (void)addr;
-    assert(0 && "not implemented");
+
+uint8_t op_cpy(cpu_t *cpu, uint16_t addr) {
+    uint8_t operand = bus_read(addr);
+    uint8_t result = cpu->y - operand;
+    set_flag(cpu, STATUS_C, cpu->y >= operand);
+    set_flag(cpu, STATUS_N, result >> 7);
+    set_flag(cpu, STATUS_Z, result == 0);
     return 0;
 }
-uint8_t op_dec(cpu_t *cpu, uint16_t addr){
-    (void)cpu; (void)addr;
-    assert(0 && "not implemented");
+
+uint8_t op_dec(cpu_t *cpu, uint16_t addr) {
+    uint8_t result = bus_read(addr) - 1;
+    bus_write(addr, result);
+    set_flag(cpu, STATUS_N, result >> 7);
+    set_flag(cpu, STATUS_Z, result == 0);
     return 0;
 }
-uint8_t op_dex(cpu_t *cpu, uint16_t addr){
-    (void)cpu; (void)addr;
-    assert(0 && "not implemented");
+
+uint8_t op_dex(cpu_t *cpu, uint16_t addr) {
+    (void)addr;
+    --cpu->x;
+    set_flag(cpu, STATUS_N, cpu->x >> 7);
+    set_flag(cpu, STATUS_Z, cpu->x == 0);
     return 0;
 }
-uint8_t op_dey(cpu_t *cpu, uint16_t addr){
-    (void)cpu; (void)addr;
-    assert(0 && "not implemented");
+
+uint8_t op_dey(cpu_t *cpu, uint16_t addr) {
+    (void)addr;
+    --cpu->y;
+    set_flag(cpu, STATUS_N, cpu->y >> 7);
+    set_flag(cpu, STATUS_Z, cpu->y == 0);
     return 0;
 }
+
 uint8_t op_eor(cpu_t *cpu, uint16_t addr){
     (void)cpu; (void)addr;
     assert(0 && "not implemented");
     return 0;
 }
-uint8_t op_inc(cpu_t *cpu, uint16_t addr){
-    (void)cpu; (void)addr;
-    assert(0 && "not implemented");
+
+uint8_t op_inc(cpu_t *cpu, uint16_t addr) {
+    uint8_t result = bus_read(addr) + 1;
+    bus_write(addr, result);
+    set_flag(cpu, STATUS_N, result >> 7);
+    set_flag(cpu, STATUS_Z, result == 0);
     return 0;
 }
-uint8_t op_inx(cpu_t *cpu, uint16_t addr){
-    (void)cpu; (void)addr;
-    assert(0 && "not implemented");
+
+uint8_t op_inx(cpu_t *cpu, uint16_t addr) {
+    (void)addr;
+    ++cpu->x;
+    set_flag(cpu, STATUS_N, cpu->x >> 7);
+    set_flag(cpu, STATUS_Z, cpu->x == 0);
     return 0;
 }
-uint8_t op_iny(cpu_t *cpu, uint16_t addr){
-    (void)cpu; (void)addr;
-    assert(0 && "not implemented");
+
+uint8_t op_iny(cpu_t *cpu, uint16_t addr) {
+    (void)addr;
+    ++cpu->y;
+    set_flag(cpu, STATUS_N, cpu->y >> 7);
+    set_flag(cpu, STATUS_Z, cpu->y == 0);
     return 0;
 }
 
@@ -300,7 +365,6 @@ uint8_t op_lsr(cpu_t *cpu, uint16_t addr){
 }
 uint8_t op_nop(cpu_t *cpu, uint16_t addr){
     (void)cpu; (void)addr;
-    assert(0 && "not implemented");
     return 0;
 }
 uint8_t op_ora(cpu_t *cpu, uint16_t addr){
