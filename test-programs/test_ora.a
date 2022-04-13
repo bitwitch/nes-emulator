@@ -1,0 +1,17 @@
+LDA #$5D
+STA $00
+
+LDA #$FF
+STA $01
+
+LDA #$5A
+ORA #$A5
+STA $0200
+
+LDA #$5A
+ORA $00
+STA $0201
+
+
+; $200   $FF
+; $201   $5F

@@ -122,11 +122,13 @@ uint8_t op_adc(cpu_t *cpu, uint16_t addr) {
     return 0;
 }
 
-uint8_t op_and(cpu_t *cpu, uint16_t addr){
-    (void)cpu; (void)addr;
-    assert(0 && "not implemented");
+uint8_t op_and(cpu_t *cpu, uint16_t addr) {
+    cpu->a &= bus_read(addr);
+    set_flag(cpu, STATUS_N, cpu->a >> 7);
+    set_flag(cpu, STATUS_Z, cpu->a == 0);
     return 0;
 }
+
 uint8_t op_asl(cpu_t *cpu, uint16_t addr){
     (void)cpu; (void)addr;
     assert(0 && "not implemented");
@@ -293,9 +295,10 @@ uint8_t op_dey(cpu_t *cpu, uint16_t addr) {
     return 0;
 }
 
-uint8_t op_eor(cpu_t *cpu, uint16_t addr){
-    (void)cpu; (void)addr;
-    assert(0 && "not implemented");
+uint8_t op_eor(cpu_t *cpu, uint16_t addr) {
+    cpu->a ^= bus_read(addr);
+    set_flag(cpu, STATUS_N, cpu->a >> 7);
+    set_flag(cpu, STATUS_Z, cpu->a == 0);
     return 0;
 }
 
@@ -366,9 +369,10 @@ uint8_t op_nop(cpu_t *cpu, uint16_t addr) {
     return 0;
 }
 
-uint8_t op_ora(cpu_t *cpu, uint16_t addr){
-    (void)cpu; (void)addr;
-    assert(0 && "not implemented");
+uint8_t op_ora(cpu_t *cpu, uint16_t addr) {
+    cpu->a |= bus_read(addr);
+    set_flag(cpu, STATUS_N, cpu->a >> 7);
+    set_flag(cpu, STATUS_Z, cpu->a == 0);
     return 0;
 }
 
