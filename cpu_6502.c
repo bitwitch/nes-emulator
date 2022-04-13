@@ -360,35 +360,48 @@ uint8_t op_lsr(cpu_t *cpu, uint16_t addr){
     assert(0 && "not implemented");
     return 0;
 }
-uint8_t op_nop(cpu_t *cpu, uint16_t addr){
+
+uint8_t op_nop(cpu_t *cpu, uint16_t addr) {
     (void)cpu; (void)addr;
     return 0;
 }
+
 uint8_t op_ora(cpu_t *cpu, uint16_t addr){
     (void)cpu; (void)addr;
     assert(0 && "not implemented");
     return 0;
 }
-uint8_t op_pha(cpu_t *cpu, uint16_t addr){
-    (void)cpu; (void)addr;
-    assert(0 && "not implemented");
+
+uint8_t op_pha(cpu_t *cpu, uint16_t addr) {
+    (void)addr;
+    bus_write(0x100 | cpu->sp, cpu->a);
+    --cpu->sp;
     return 0;
 }
-uint8_t op_php(cpu_t *cpu, uint16_t addr){
-    (void)cpu; (void)addr;
-    assert(0 && "not implemented");
+
+uint8_t op_php(cpu_t *cpu, uint16_t addr) {
+    (void)addr;
+    bus_write(0x100 | cpu->sp, cpu->status);
+    --cpu->sp;
     return 0;
 }
-uint8_t op_pla(cpu_t *cpu, uint16_t addr){
-    (void)cpu; (void)addr;
-    assert(0 && "not implemented");
+
+uint8_t op_pla(cpu_t *cpu, uint16_t addr) {
+    (void)addr;
+    ++cpu->sp;
+    cpu->a = bus_read(0x100 | cpu->sp);
+    set_flag(cpu, STATUS_N, cpu->a >> 7);
+    set_flag(cpu, STATUS_Z, cpu->a == 0);
     return 0;
 }
-uint8_t op_plp(cpu_t *cpu, uint16_t addr){
-    (void)cpu; (void)addr;
-    assert(0 && "not implemented");
+
+uint8_t op_plp(cpu_t *cpu, uint16_t addr) {
+    (void)addr;
+    ++cpu->sp;
+    cpu->status = bus_read(0x100 | cpu->sp);
     return 0;
 }
+
 uint8_t op_rol(cpu_t *cpu, uint16_t addr){
     (void)cpu; (void)addr;
     assert(0 && "not implemented");
@@ -432,14 +445,15 @@ uint8_t op_sec(cpu_t *cpu, uint16_t addr) {
     return 0;
 }
 
-uint8_t op_sed(cpu_t *cpu, uint16_t addr){
-    (void)cpu; (void)addr;
-    assert(0 && "not implemented");
+uint8_t op_sed(cpu_t *cpu, uint16_t addr) {
+    (void)addr;
+    set_flag(cpu, STATUS_D, 1);
     return 0;
 }
-uint8_t op_sei(cpu_t *cpu, uint16_t addr){
-    (void)cpu; (void)addr;
-    assert(0 && "not implemented");
+
+uint8_t op_sei(cpu_t *cpu, uint16_t addr) {
+    (void)addr;
+    set_flag(cpu, STATUS_I, 1);
     return 0;
 }
 
@@ -459,7 +473,7 @@ uint8_t op_sty(cpu_t *cpu, uint16_t addr) {
 }
 
 uint8_t op_tax(cpu_t *cpu, uint16_t addr) {
-    (void) addr; /* implied */
+    (void)addr;
     cpu->x = cpu->a;
     set_flag(cpu, STATUS_N, cpu->x >> 7);
     set_flag(cpu, STATUS_Z, cpu->x == 0);
@@ -467,7 +481,7 @@ uint8_t op_tax(cpu_t *cpu, uint16_t addr) {
 }
 
 uint8_t op_tay(cpu_t *cpu, uint16_t addr) {
-    (void) addr; /* implied */
+    (void)addr;
     cpu->y = cpu->a;
     set_flag(cpu, STATUS_N, cpu->y >> 7);
     set_flag(cpu, STATUS_Z, cpu->y == 0);
@@ -475,7 +489,7 @@ uint8_t op_tay(cpu_t *cpu, uint16_t addr) {
 }
 
 uint8_t op_tsx(cpu_t *cpu, uint16_t addr) {
-    (void) addr; /* implied */
+    (void)addr;
     cpu->x = cpu->sp;
     set_flag(cpu, STATUS_N, cpu->x >> 7);
     set_flag(cpu, STATUS_Z, cpu->x == 0);
@@ -483,7 +497,7 @@ uint8_t op_tsx(cpu_t *cpu, uint16_t addr) {
 }
 
 uint8_t op_txa(cpu_t *cpu, uint16_t addr) {
-    (void) addr; /* implied */
+    (void)addr;
     cpu->a = cpu->x;
     set_flag(cpu, STATUS_N, cpu->a >> 7);
     set_flag(cpu, STATUS_Z, cpu->a == 0);
@@ -491,13 +505,14 @@ uint8_t op_txa(cpu_t *cpu, uint16_t addr) {
 }
 
 uint8_t op_txs(cpu_t *cpu, uint16_t addr) {
-    (void) addr; /* implied */
+    (void)addr;
     cpu->sp = cpu->x;
+
     return 0;
 }
- 
+
 uint8_t op_tya(cpu_t *cpu, uint16_t addr) {
-    (void) addr; /* implied */
+    (void)addr;
     cpu->a = cpu->y;
     set_flag(cpu, STATUS_N, cpu->a >> 7);
     set_flag(cpu, STATUS_Z, cpu->a == 0);
