@@ -23,7 +23,7 @@ void set_flag(cpu_t *cpu, status_mask_t flag, bool value) {
 /****************************************************************************/
 /* address modes */
 /****************************************************************************/
-uint16_t am_imp(cpu_t *cpu) { 
+uint16_t am_imp(cpu_t *cpu) {
     (void)cpu; 
     return 0; 
 }
@@ -129,9 +129,23 @@ uint8_t op_and(cpu_t *cpu, uint16_t addr) {
     return 0;
 }
 
-uint8_t op_asl(cpu_t *cpu, uint16_t addr){
-    (void)cpu; (void)addr;
-    assert(0 && "not implemented");
+uint8_t op_asl(cpu_t *cpu, uint16_t addr) {
+    if (cpu->opcode == 0x0A) {
+        /* accumulator mode */
+        set_flag(cpu, STATUS_C, cpu->a >> 7);
+        cpu->a <<= 1;
+        set_flag(cpu, STATUS_N, cpu->a >> 7);
+        set_flag(cpu, STATUS_Z, cpu->a == 0);
+    } else { 
+        /* memory mode */
+        uint8_t operand = bus_read(addr);
+        uint8_t result = operand << 1;
+        bus_write(addr, result);
+        set_flag(cpu, STATUS_C, operand >> 7);
+        set_flag(cpu, STATUS_N, result >> 7);
+        set_flag(cpu, STATUS_Z, result == 0);
+    }
+
     return 0;
 }
 
@@ -358,9 +372,22 @@ uint8_t op_ldy(cpu_t *cpu, uint16_t addr) {
     return 0;
 }
 
-uint8_t op_lsr(cpu_t *cpu, uint16_t addr){
-    (void)cpu; (void)addr;
-    assert(0 && "not implemented");
+uint8_t op_lsr(cpu_t *cpu, uint16_t addr) {
+    if (cpu->opcode == 0x4A) {
+        /* accumulator mode */
+        set_flag(cpu, STATUS_C, cpu->a & 1);
+        cpu->a >>= 1;
+        set_flag(cpu, STATUS_N, cpu->a >> 7);
+        set_flag(cpu, STATUS_Z, cpu->a == 0);
+    } else { 
+        /* memory mode */
+        uint8_t operand = bus_read(addr);
+        uint8_t result = operand >> 1;
+        bus_write(addr, result);
+        set_flag(cpu, STATUS_C, operand & 1);
+        set_flag(cpu, STATUS_N, result >> 7);
+        set_flag(cpu, STATUS_Z, result == 0);
+    }
     return 0;
 }
 
@@ -406,16 +433,46 @@ uint8_t op_plp(cpu_t *cpu, uint16_t addr) {
     return 0;
 }
 
-uint8_t op_rol(cpu_t *cpu, uint16_t addr){
-    (void)cpu; (void)addr;
-    assert(0 && "not implemented");
+uint8_t op_rol(cpu_t *cpu, uint16_t addr) {
+    uint8_t old_c = get_flag(cpu, STATUS_C);
+    if (cpu->opcode == 0x2A) {
+        /* accumulator mode */
+        set_flag(cpu, STATUS_C, cpu->a >> 7);
+        cpu->a = (cpu->a << 1) | old_c;
+        set_flag(cpu, STATUS_N, cpu->a >> 7);
+        set_flag(cpu, STATUS_Z, cpu->a == 0);
+    } else { 
+        /* memory mode */
+        uint8_t operand = bus_read(addr);
+        uint8_t result = (operand << 1) | old_c;
+        bus_write(addr, result);
+        set_flag(cpu, STATUS_C, operand >> 7);
+        set_flag(cpu, STATUS_N, result >> 7);
+        set_flag(cpu, STATUS_Z, result == 0);
+    }
     return 0;
 }
-uint8_t op_ror(cpu_t *cpu, uint16_t addr){
-    (void)cpu; (void)addr;
-    assert(0 && "not implemented");
+
+uint8_t op_ror(cpu_t *cpu, uint16_t addr) {
+    uint8_t old_c = get_flag(cpu, STATUS_C);
+    if (cpu->opcode == 0x6A) {
+        /* accumulator mode */
+        set_flag(cpu, STATUS_C, cpu->a & 1);
+        cpu->a = (old_c << 7) | (cpu->a >> 1);
+        set_flag(cpu, STATUS_N, cpu->a >> 7);
+        set_flag(cpu, STATUS_Z, cpu->a == 0);
+    } else { 
+        /* memory mode */
+        uint8_t operand = bus_read(addr);
+        uint8_t result = (old_c << 7) | (operand >> 1);
+        bus_write(addr, result);
+        set_flag(cpu, STATUS_C, operand & 1);
+        set_flag(cpu, STATUS_N, result >> 7);
+        set_flag(cpu, STATUS_Z, result == 0);
+    }
     return 0;
 }
+
 uint8_t op_rti(cpu_t *cpu, uint16_t addr){
     (void)cpu; (void)addr;
     assert(0 && "not implemented");
@@ -574,21 +631,20 @@ void cpu_reset(cpu_t *cpu) {
 }
 
 void cpu_tick(cpu_t *cpu) {
-    uint8_t opcode = bus_read(cpu->pc++);
-    op_t op = ops[opcode];
+    cpu->opcode = bus_read(cpu->pc++);
+    op_t op = ops[cpu->opcode];
     uint16_t addr = op.addr_mode(cpu);
     op.execute(cpu, addr);
 }
 
 int cpu_run(cpu_t *cpu) {
-    uint8_t opcode;
     uint16_t addr;
     op_t op;
     cpu->running = true;
 
     while (cpu->running) {
-        opcode = bus_read(cpu->pc++);
-        op = ops[opcode];
+        cpu->opcode = bus_read(cpu->pc++);
+        op = ops[cpu->opcode];
         addr = op.addr_mode(cpu);
         op.execute(cpu, addr);
 

@@ -9,6 +9,7 @@
 typedef struct {
     uint8_t a, x, y, sp, status;
     uint16_t pc;
+    uint8_t opcode;   /* stores current opcode fetched, used for the few instructions that have memory and accumulator modes */
     int cycle_counter, interrupt_period;
     bool running;
 } cpu_t;
