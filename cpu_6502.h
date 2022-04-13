@@ -2,6 +2,7 @@
 #define CPU_6502_H
 
 #include <stdint.h>
+#include <stdbool.h>
 
 #define OP_COUNT 256
 
@@ -9,7 +10,7 @@ typedef struct {
     uint8_t a, x, y, sp, status;
     uint16_t pc;
     int cycle_counter, interrupt_period;
-    int running;
+    bool running;
 } cpu_t;
 
 typedef struct {
@@ -22,14 +23,14 @@ typedef struct {
 } op_t;
 
 typedef enum {
-    STATUS_C = 0,
-    STATUS_Z = 1,
-    STATUS_I = 2,
-    STATUS_D = 3,
-    STATUS_B = 4,
-    STATUS_V = 6,
-    STATUS_N = 7
-} status_bit_t;
+    STATUS_C = 1 << 0,
+    STATUS_Z = 1 << 1,
+    STATUS_I = 1 << 2,
+    STATUS_D = 1 << 3,
+    STATUS_B = 1 << 4,
+    STATUS_V = 1 << 6,
+    STATUS_N = 1 << 7
+} status_mask_t;
 
 
 void cpu_tick(cpu_t *cpu);  /* executes a single instruction */
@@ -37,8 +38,8 @@ int cpu_run(cpu_t *cpu);
 void cpu_reset(cpu_t *cpu);
 
 /* exposed so the repl can easily inspect cpu internal state */
-uint8_t get_flag(cpu_t *cpu, status_bit_t sbit);
-void set_flag(cpu_t *cpu, status_bit_t sbit, int value);
+uint8_t get_flag(cpu_t *cpu, status_mask_t flag);
+void set_flag(cpu_t *cpu, status_mask_t flag, bool value);
 
 
 /*****************************************************************/

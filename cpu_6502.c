@@ -12,15 +12,12 @@ typedef union {
 #endif
 } word_t;
 
-uint8_t get_flag(cpu_t *cpu, status_bit_t sbit) {
-    uint8_t mask = 1 << sbit;
-    return (cpu->status & mask) != 0;
+uint8_t get_flag(cpu_t *cpu, status_mask_t flag) {
+    return (cpu->status & flag) != 0;
 }
 
-void set_flag(cpu_t *cpu, status_bit_t sbit, int value) {
-    assert(value == 0 || value == 1);
-    uint8_t mask = 1 << sbit;
-    cpu->status = (cpu->status & (~mask)) | value << sbit;
+void set_flag(cpu_t *cpu, status_mask_t flag, bool value) {
+    cpu->status = value ? cpu->status | flag : cpu->status & (~flag);
 }
 
 /****************************************************************************/
@@ -199,7 +196,7 @@ uint8_t op_bpl(cpu_t *cpu, uint16_t addr) {
 uint8_t op_brk(cpu_t *cpu, uint16_t addr) {
     (void)addr;
     /* TODO(shaw): this is just a hack to get the repl working, need to actually implement BRK */
-    cpu->running = 0;
+    cpu->running = false;
     return 0;
 }
 
@@ -554,7 +551,7 @@ void cpu_reset(cpu_t *cpu) {
     cpu->interrupt_period = 1;
     cpu->cycle_counter = cpu->interrupt_period;
 
-    cpu->running = 1;
+    cpu->running = true;
 }
 
 void cpu_tick(cpu_t *cpu) {
@@ -568,7 +565,7 @@ int cpu_run(cpu_t *cpu) {
     uint8_t opcode;
     uint16_t addr;
     op_t op;
-    cpu->running = 1;
+    cpu->running = true;
 
     while (cpu->running) {
         opcode = bus_read(cpu->pc++);
