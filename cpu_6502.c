@@ -424,15 +424,14 @@ uint8_t op_pha(cpu_t *cpu, uint16_t addr) {
 
 uint8_t op_php(cpu_t *cpu, uint16_t addr) {
     (void)addr;
-    bus_write(0x100 | cpu->sp, cpu->status);
+    bus_write(0x100 | cpu->sp, cpu->status | STATUS_U | STATUS_B );
     --cpu->sp;
     return 0;
 }
 
 uint8_t op_pla(cpu_t *cpu, uint16_t addr) {
     (void)addr;
-    ++cpu->sp;
-    cpu->a = bus_read(0x100 | cpu->sp);
+    cpu->a = bus_read(0x100 | ++cpu->sp);
     set_flag(cpu, STATUS_N, cpu->a >> 7);
     set_flag(cpu, STATUS_Z, cpu->a == 0);
     return 0;
@@ -440,8 +439,7 @@ uint8_t op_pla(cpu_t *cpu, uint16_t addr) {
 
 uint8_t op_plp(cpu_t *cpu, uint16_t addr) {
     (void)addr;
-    ++cpu->sp;
-    cpu->status = bus_read(0x100 | cpu->sp);
+    cpu->status = bus_read(0x100 | ++cpu->sp) | STATUS_U | STATUS_B;
     return 0;
 }
 
@@ -485,9 +483,18 @@ uint8_t op_ror(cpu_t *cpu, uint16_t addr) {
     return 0;
 }
 
-uint8_t op_rti(cpu_t *cpu, uint16_t addr){
-    (void)cpu; (void)addr;
-    assert(0 && "not implemented");
+
+/* NOTE(shaw): see https://www.nesdev.org/wiki/Status_flags#The_B_flag
+ * for more info regarding rti ignoring bits 4 and 5 of the
+ * status pulled from the stack
+ */
+uint8_t op_rti(cpu_t *cpu, uint16_t addr) {
+    (void)addr;
+    word_t temp;
+    cpu->status = bus_read(0x100 | ++cpu->sp) | STATUS_U | STATUS_B;
+    temp.byte.l = bus_read(0x100 | ++cpu->sp);
+    temp.byte.h = bus_read(0x100 | ++cpu->sp);
+    cpu->pc = temp.w;
     return 0;
 }
 
@@ -631,7 +638,7 @@ void cpu_reset(cpu_t *cpu) {
     cpu->x = 0;
     cpu->y = 0;
     cpu->sp = 0xFF;
-    cpu->status = 1 << 5;
+    cpu->status = STATUS_U | STATUS_B;
 
     /* TODO(shaw): the reset vector is 0xFFFC, 0xFFFD on startup the cpu would
      * read the values at these locations into pc and perform a JMP. For now

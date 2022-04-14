@@ -28,7 +28,12 @@ typedef enum {
     STATUS_Z = 1 << 1,
     STATUS_I = 1 << 2,
     STATUS_D = 1 << 3,
+
+    /* bits 4 and 5 dont actually exist in the status register
+     * see https://www.nesdev.org/wiki/Status_flags#The_B_flag */
     STATUS_B = 1 << 4,
+    STATUS_U = 1 << 5,
+
     STATUS_V = 1 << 6,
     STATUS_N = 1 << 7
 } status_mask_t;
