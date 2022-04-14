@@ -176,9 +176,11 @@ uint8_t op_beq(cpu_t *cpu, uint16_t addr) {
     return 0;
 }
 
-uint8_t op_bit(cpu_t *cpu, uint16_t addr){
-    (void)cpu; (void)addr;
-    assert(0 && "not implemented");
+uint8_t op_bit(cpu_t *cpu, uint16_t addr) {
+    uint8_t operand = bus_read(addr);
+    /* set bits 7 and 6 of status reg (N,V) to bits 7 and 6 of operand */
+    cpu->status = (cpu->status & ~0xC0) | (operand & 0xC0);
+    set_flag(cpu, STATUS_Z, !(cpu->a & operand));
     return 0;
 }
 

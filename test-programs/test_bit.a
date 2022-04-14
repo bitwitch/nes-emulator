@@ -1,0 +1,21 @@
+    LDA #$5A
+    STA $00
+    LDA #$5C
+    STA $01
+
+    LDA #4
+    BIT $00
+    BNE matchone
+    BIT $01
+    BNE matchtwo
+    BRK
+
+matchone:
+    LDA #1
+    STA $02
+    BRK
+matchtwo:
+    LDA #2
+    STA $02
+    BRK
+
