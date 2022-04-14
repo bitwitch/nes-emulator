@@ -1,0 +1,14 @@
+    ldx #1
+    inx
+    inx
+    jsr subroutine
+    dex
+    inx
+    inx
+    brk
+
+subroutine:
+    lda #$69
+    sta $00
+    rts
+

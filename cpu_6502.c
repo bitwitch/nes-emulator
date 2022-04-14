@@ -347,9 +347,19 @@ uint8_t op_jmp(cpu_t *cpu, uint16_t addr) {
     return 0;
 }
 
-uint8_t op_jsr(cpu_t *cpu, uint16_t addr){
-    (void)cpu; (void)addr;
-    assert(0 && "not implemented");
+/* 
+ * we want to push pc+2 on the stack (the third byte of the jsr instruction)
+ * pc was already incremented once for the opcode read
+ * pc was then incremented twice for the address read by am_abs()
+ * so to get the third byte we actually have to push pc - 1 on the stack
+ */
+uint8_t op_jsr(cpu_t *cpu, uint16_t addr) {
+    word_t return_addr = { .w = cpu->pc - 1 };
+    bus_write(0x100 | cpu->sp, return_addr.byte.h);
+    --cpu->sp;
+    bus_write(0x100 | cpu->sp, return_addr.byte.l);
+    --cpu->sp;
+    cpu->pc = addr;
     return 0;
 }
 
@@ -480,9 +490,13 @@ uint8_t op_rti(cpu_t *cpu, uint16_t addr){
     assert(0 && "not implemented");
     return 0;
 }
-uint8_t op_rts(cpu_t *cpu, uint16_t addr){
-    (void)cpu; (void)addr;
-    assert(0 && "not implemented");
+
+uint8_t op_rts(cpu_t *cpu, uint16_t addr) {
+    (void)addr;
+    word_t temp;
+    temp.byte.l = bus_read(0x100 | ++cpu->sp);
+    temp.byte.h = bus_read(0x100 | ++cpu->sp);
+    cpu->pc = temp.w + 1;
     return 0;
 }
 
