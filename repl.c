@@ -4,6 +4,7 @@
 #include <string.h>
 #include "bus.h"
 #include "cpu_6502.h"
+#include "cart.h"
 
 #define MAX_TOKENS 32
 
@@ -146,42 +147,49 @@ int execute_command(cpu_t *cpu, char **tokens) {
             uint16_t address = parse_address(*current++);
             char *filepath = *current++;
 
-            FILE *fp = fopen(filepath, "r");
-            if (!fp) {
-                perror("fopen");
-                return 1;
-            }
+            if (strcasestr(filepath, ".nes")) {
+                cart_t cart = ines_read(filepath);
+                load_memory(address, cart.prg_rom, CART_PRG_ROM_SIZE(cart.header));
+                delete_cart(&cart);
+            } else {
 
-            if (fseek(fp, 0L, SEEK_END) < 0) {
-                perror("fseek");
-                return 1;
-            }
+                FILE *fp = fopen(filepath, "r");
+                if (!fp) {
+                    perror("fopen");
+                    return 1;
+                }
 
-            int bytes = ftell(fp);
-            if (bytes < 0) {
-                perror("ftell");
-                return 1;
-            }
+                if (fseek(fp, 0L, SEEK_END) < 0) {
+                    perror("fseek");
+                    return 1;
+                }
 
-            rewind(fp);
+                int bytes = ftell(fp);
+                if (bytes < 0) {
+                    perror("ftell");
+                    return 1;
+                }
 
-            uint8_t *buf = malloc(bytes * sizeof(uint8_t));
-            if (!buf) {
-                perror("malloc");
-                return 1;
-            }
+                rewind(fp);
 
-            fread(buf, sizeof(uint8_t), bytes, fp);
+                uint8_t *buf = malloc(bytes * sizeof(uint8_t));
+                if (!buf) {
+                    perror("malloc");
+                    return 1;
+                }
 
-            if (ferror(fp) && !feof(fp)) {
-                perror("fread");
+                fread(buf, sizeof(uint8_t), bytes, fp);
+
+                if (ferror(fp) && !feof(fp)) {
+                    perror("fread");
+                    free(buf);
+                    return 1;
+                }
+
+                load_memory(address, buf, bytes);
+
                 free(buf);
-                return 1;
             }
-
-            load_memory(address, buf, bytes);
-
-            free(buf);
             break;
         }
 
