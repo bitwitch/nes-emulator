@@ -35,7 +35,7 @@ uint16_t am_abs(cpu_t *cpu) {
     return addr.w;
 }
 
-uint16_t am_abs_x(cpu_t *cpu) {
+uint16_t am_abx(cpu_t *cpu) {
     word_t addr;
     addr.byte.l = bus_read(cpu->pc++);
     addr.byte.h = bus_read(cpu->pc++);
@@ -43,7 +43,7 @@ uint16_t am_abs_x(cpu_t *cpu) {
     return addr.w;
 }
 
-uint16_t am_abs_y(cpu_t *cpu) {
+uint16_t am_aby(cpu_t *cpu) {
     word_t addr;
     addr.byte.l = bus_read(cpu->pc++);
     addr.byte.h = bus_read(cpu->pc++);
@@ -101,12 +101,12 @@ uint16_t am_zpg(cpu_t *cpu) {
     return bus_read(cpu->pc++);
 }
 
-uint16_t am_zpg_x(cpu_t *cpu) {
+uint16_t am_zpx(cpu_t *cpu) {
     uint8_t addr = cpu->x + bus_read(cpu->pc++);
     return addr;
 }
 
-uint16_t am_zpg_y(cpu_t *cpu) {
+uint16_t am_zpy(cpu_t *cpu) {
     uint8_t addr = cpu->y + bus_read(cpu->pc++);
     return addr;
 }
@@ -610,32 +610,142 @@ uint8_t op_tya(cpu_t *cpu, uint16_t addr) {
 }
 
 
-uint8_t op_xxx(cpu_t *cpu, uint16_t addr) {
+/* 
+ * Illegal Opcodes 
+ */ 
+uint8_t op_kil(cpu_t *cpu, uint16_t addr) {
     (void)cpu; 
     (void)addr;
-    printf("Illegal opcode used\n");
-    assert(0 && "not reached");
+    return 0;
+}
+
+uint8_t op_slo(cpu_t *cpu, uint16_t addr) {
+    (void)cpu; 
+    (void)addr;
+    return 0;
+}
+
+uint8_t op_rla(cpu_t *cpu, uint16_t addr) {
+    (void)cpu; 
+    (void)addr;
+    return 0;
+}
+
+uint8_t op_sre(cpu_t *cpu, uint16_t addr) {
+    (void)cpu; 
+    (void)addr;
+    return 0;
+}
+
+uint8_t op_rra(cpu_t *cpu, uint16_t addr) {
+    (void)cpu; 
+    (void)addr;
+    return 0;
+}
+
+uint8_t op_sax(cpu_t *cpu, uint16_t addr) {
+    (void)cpu; 
+    (void)addr;
+    return 0;
+}
+
+uint8_t op_lax(cpu_t *cpu, uint16_t addr) {
+    (void)cpu; 
+    (void)addr;
+    return 0;
+}
+
+uint8_t op_dcp(cpu_t *cpu, uint16_t addr) {
+    (void)cpu; 
+    (void)addr;
+    return 0;
+}
+
+uint8_t op_isc(cpu_t *cpu, uint16_t addr) {
+    (void)cpu; 
+    (void)addr;
+    return 0;
+}
+
+uint8_t op_anc(cpu_t *cpu, uint16_t addr) {
+    (void)cpu; 
+    (void)addr;
+    return 0;
+}
+
+uint8_t op_alr(cpu_t *cpu, uint16_t addr) {
+    (void)cpu; 
+    (void)addr;
+    return 0;
+}
+
+uint8_t op_arr(cpu_t *cpu, uint16_t addr) {
+    (void)cpu; 
+    (void)addr;
+    return 0;
+}
+
+uint8_t op_xaa(cpu_t *cpu, uint16_t addr) {
+    (void)cpu; 
+    (void)addr;
+    return 0;
+}
+
+uint8_t op_axs(cpu_t *cpu, uint16_t addr) {
+    (void)cpu; 
+    (void)addr;
+    return 0;
+}
+
+uint8_t op_ahx(cpu_t *cpu, uint16_t addr) {
+    (void)cpu; 
+    (void)addr;
+    return 0;
+}
+
+uint8_t op_shy(cpu_t *cpu, uint16_t addr) {
+    (void)cpu; 
+    (void)addr;
+    return 0;
+}
+
+uint8_t op_shx(cpu_t *cpu, uint16_t addr) {
+    (void)cpu; 
+    (void)addr;
+    return 0;
+}
+
+uint8_t op_tas(cpu_t *cpu, uint16_t addr) {
+    (void)cpu; 
+    (void)addr;
+    return 0;
+}
+
+uint8_t op_las(cpu_t *cpu, uint16_t addr) {
+    (void)cpu; 
+    (void)addr;
+    return 0;
 }
 
 
 op_t ops[OP_COUNT] = 
 {
-    { "BRK", 7, &op_brk, &am_imm },{ "ORA", 6, &op_ora, &am_x_ind },{ "xxx", 2, &op_xxx, &am_imp },{ "xxx", 8, &op_xxx, &am_imp },{ "xxx", 3, &op_nop, &am_imp },{ "ORA", 3, &op_ora, &am_zpg },{ "ASL", 5, &op_asl, &am_zpg },{ "xxx", 5, &op_xxx, &am_imp },{ "PHP", 3, &op_php, &am_imp },{ "ORA", 2, &op_ora, &am_imm },{ "ASL", 2, &op_asl, &am_imp },{ "xxx", 2, &op_xxx, &am_imp },{ "xxx", 4, &op_nop, &am_imp },{ "ORA", 4, &op_ora, &am_abs },{ "ASL", 6, &op_asl, &am_abs },{ "xxx", 6, &op_xxx, &am_imp },
-    { "BPL", 2, &op_bpl, &am_rel },{ "ORA", 5, &op_ora, &am_ind_y },{ "xxx", 2, &op_xxx, &am_imp },{ "xxx", 8, &op_xxx, &am_imp },{ "xxx", 4, &op_nop, &am_imp },{ "ORA", 4, &op_ora, &am_zpg_x },{ "ASL", 6, &op_asl, &am_zpg_x },{ "xxx", 6, &op_xxx, &am_imp },{ "CLC", 2, &op_clc, &am_imp },{ "ORA", 4, &op_ora, &am_abs_y },{ "xxx", 2, &op_nop, &am_imp },{ "xxx", 7, &op_xxx, &am_imp },{ "xxx", 4, &op_nop, &am_imp },{ "ORA", 4, &op_ora, &am_abs_x },{ "ASL", 7, &op_asl, &am_abs_x },{ "xxx", 7, &op_xxx, &am_imp },
-    { "JSR", 6, &op_jsr, &am_abs },{ "AND", 6, &op_and, &am_x_ind },{ "xxx", 2, &op_xxx, &am_imp },{ "xxx", 8, &op_xxx, &am_imp },{ "BIT", 3, &op_bit, &am_zpg },{ "AND", 3, &op_and, &am_zpg },{ "ROL", 5, &op_rol, &am_zpg },{ "xxx", 5, &op_xxx, &am_imp },{ "PLP", 4, &op_plp, &am_imp },{ "AND", 2, &op_and, &am_imm },{ "ROL", 2, &op_rol, &am_imp },{ "xxx", 2, &op_xxx, &am_imp },{ "BIT", 4, &op_bit, &am_abs },{ "AND", 4, &op_and, &am_abs },{ "ROL", 6, &op_rol, &am_abs },{ "xxx", 6, &op_xxx, &am_imp },
-    { "BMI", 2, &op_bmi, &am_rel },{ "AND", 5, &op_and, &am_ind_y },{ "xxx", 2, &op_xxx, &am_imp },{ "xxx", 8, &op_xxx, &am_imp },{ "xxx", 4, &op_nop, &am_imp },{ "AND", 4, &op_and, &am_zpg_x },{ "ROL", 6, &op_rol, &am_zpg_x },{ "xxx", 6, &op_xxx, &am_imp },{ "SEC", 2, &op_sec, &am_imp },{ "AND", 4, &op_and, &am_abs_y },{ "xxx", 2, &op_nop, &am_imp },{ "xxx", 7, &op_xxx, &am_imp },{ "xxx", 4, &op_nop, &am_imp },{ "AND", 4, &op_and, &am_abs_x },{ "ROL", 7, &op_rol, &am_abs_x },{ "xxx", 7, &op_xxx, &am_imp },
-    { "RTI", 6, &op_rti, &am_imp },{ "EOR", 6, &op_eor, &am_x_ind },{ "xxx", 2, &op_xxx, &am_imp },{ "xxx", 8, &op_xxx, &am_imp },{ "xxx", 3, &op_nop, &am_imp },{ "EOR", 3, &op_eor, &am_zpg },{ "LSR", 5, &op_lsr, &am_zpg },{ "xxx", 5, &op_xxx, &am_imp },{ "PHA", 3, &op_pha, &am_imp },{ "EOR", 2, &op_eor, &am_imm },{ "LSR", 2, &op_lsr, &am_imp },{ "xxx", 2, &op_xxx, &am_imp },{ "JMP", 3, &op_jmp, &am_abs },{ "EOR", 4, &op_eor, &am_abs },{ "LSR", 6, &op_lsr, &am_abs },{ "xxx", 6, &op_xxx, &am_imp },
-    { "BVC", 2, &op_bvc, &am_rel },{ "EOR", 5, &op_eor, &am_ind_y },{ "xxx", 2, &op_xxx, &am_imp },{ "xxx", 8, &op_xxx, &am_imp },{ "xxx", 4, &op_nop, &am_imp },{ "EOR", 4, &op_eor, &am_zpg_x },{ "LSR", 6, &op_lsr, &am_zpg_x },{ "xxx", 6, &op_xxx, &am_imp },{ "CLI", 2, &op_cli, &am_imp },{ "EOR", 4, &op_eor, &am_abs_y },{ "xxx", 2, &op_nop, &am_imp },{ "xxx", 7, &op_xxx, &am_imp },{ "xxx", 4, &op_nop, &am_imp },{ "EOR", 4, &op_eor, &am_abs_x },{ "LSR", 7, &op_lsr, &am_abs_x },{ "xxx", 7, &op_xxx, &am_imp },
-    { "RTS", 6, &op_rts, &am_imp },{ "ADC", 6, &op_adc, &am_x_ind },{ "xxx", 2, &op_xxx, &am_imp },{ "xxx", 8, &op_xxx, &am_imp },{ "xxx", 3, &op_nop, &am_imp },{ "ADC", 3, &op_adc, &am_zpg },{ "ROR", 5, &op_ror, &am_zpg },{ "xxx", 5, &op_xxx, &am_imp },{ "PLA", 4, &op_pla, &am_imp },{ "ADC", 2, &op_adc, &am_imm },{ "ROR", 2, &op_ror, &am_imp },{ "xxx", 2, &op_xxx, &am_imp },{ "JMP", 5, &op_jmp, &am_ind },{ "ADC", 4, &op_adc, &am_abs },{ "ROR", 6, &op_ror, &am_abs },{ "xxx", 6, &op_xxx, &am_imp },
-    { "BVS", 2, &op_bvs, &am_rel },{ "ADC", 5, &op_adc, &am_ind_y },{ "xxx", 2, &op_xxx, &am_imp },{ "xxx", 8, &op_xxx, &am_imp },{ "xxx", 4, &op_nop, &am_imp },{ "ADC", 4, &op_adc, &am_zpg_x },{ "ROR", 6, &op_ror, &am_zpg_x },{ "xxx", 6, &op_xxx, &am_imp },{ "SEI", 2, &op_sei, &am_imp },{ "ADC", 4, &op_adc, &am_abs_y },{ "xxx", 2, &op_nop, &am_imp },{ "xxx", 7, &op_xxx, &am_imp },{ "xxx", 4, &op_nop, &am_imp },{ "ADC", 4, &op_adc, &am_abs_x },{ "ROR", 7, &op_ror, &am_abs_x },{ "xxx", 7, &op_xxx, &am_imp },
-    { "xxx", 2, &op_nop, &am_imp },{ "STA", 6, &op_sta, &am_x_ind },{ "xxx", 2, &op_nop, &am_imp },{ "xxx", 6, &op_xxx, &am_imp },{ "STY", 3, &op_sty, &am_zpg },{ "STA", 3, &op_sta, &am_zpg },{ "STX", 3, &op_stx, &am_zpg },{ "xxx", 3, &op_xxx, &am_imp },{ "DEY", 2, &op_dey, &am_imp },{ "xxx", 2, &op_nop, &am_imp },{ "TXA", 2, &op_txa, &am_imp },{ "xxx", 2, &op_xxx, &am_imp },{ "STY", 4, &op_sty, &am_abs },{ "STA", 4, &op_sta, &am_abs },{ "STX", 4, &op_stx, &am_abs },{ "xxx", 4, &op_xxx, &am_imp },
-    { "BCC", 2, &op_bcc, &am_rel },{ "STA", 6, &op_sta, &am_ind_y },{ "xxx", 2, &op_xxx, &am_imp },{ "xxx", 6, &op_xxx, &am_imp },{ "STY", 4, &op_sty, &am_zpg_x },{ "STA", 4, &op_sta, &am_zpg_x },{ "STX", 4, &op_stx, &am_zpg_y },{ "xxx", 4, &op_xxx, &am_imp },{ "TYA", 2, &op_tya, &am_imp },{ "STA", 5, &op_sta, &am_abs_y },{ "TXS", 2, &op_txs, &am_imp },{ "xxx", 5, &op_xxx, &am_imp },{ "xxx", 5, &op_nop, &am_imp },{ "STA", 5, &op_sta, &am_abs_x },{ "xxx", 5, &op_xxx, &am_imp },{ "xxx", 5, &op_xxx, &am_imp },
-    { "LDY", 2, &op_ldy, &am_imm },{ "LDA", 6, &op_lda, &am_x_ind },{ "LDX", 2, &op_ldx, &am_imm },{ "xxx", 6, &op_xxx, &am_imp },{ "LDY", 3, &op_ldy, &am_zpg },{ "LDA", 3, &op_lda, &am_zpg },{ "LDX", 3, &op_ldx, &am_zpg },{ "xxx", 3, &op_xxx, &am_imp },{ "TAY", 2, &op_tay, &am_imp },{ "LDA", 2, &op_lda, &am_imm },{ "TAX", 2, &op_tax, &am_imp },{ "xxx", 2, &op_xxx, &am_imp },{ "LDY", 4, &op_ldy, &am_abs },{ "LDA", 4, &op_lda, &am_abs },{ "LDX", 4, &op_ldx, &am_abs },{ "xxx", 4, &op_xxx, &am_imp },
-    { "BCS", 2, &op_bcs, &am_rel },{ "LDA", 5, &op_lda, &am_ind_y },{ "xxx", 2, &op_xxx, &am_imp },{ "xxx", 5, &op_xxx, &am_imp },{ "LDY", 4, &op_ldy, &am_zpg_x },{ "LDA", 4, &op_lda, &am_zpg_x },{ "LDX", 4, &op_ldx, &am_zpg_y },{ "xxx", 4, &op_xxx, &am_imp },{ "CLV", 2, &op_clv, &am_imp },{ "LDA", 4, &op_lda, &am_abs_y },{ "TSX", 2, &op_tsx, &am_imp },{ "xxx", 4, &op_xxx, &am_imp },{ "LDY", 4, &op_ldy, &am_abs_x },{ "LDA", 4, &op_lda, &am_abs_x },{ "LDX", 4, &op_ldx, &am_abs_y },{ "xxx", 4, &op_xxx, &am_imp },
-    { "CPY", 2, &op_cpy, &am_imm },{ "CMP", 6, &op_cmp, &am_x_ind },{ "xxx", 2, &op_nop, &am_imp },{ "xxx", 8, &op_xxx, &am_imp },{ "CPY", 3, &op_cpy, &am_zpg },{ "CMP", 3, &op_cmp, &am_zpg },{ "DEC", 5, &op_dec, &am_zpg },{ "xxx", 5, &op_xxx, &am_imp },{ "INY", 2, &op_iny, &am_imp },{ "CMP", 2, &op_cmp, &am_imm },{ "DEX", 2, &op_dex, &am_imp },{ "xxx", 2, &op_xxx, &am_imp },{ "CPY", 4, &op_cpy, &am_abs },{ "CMP", 4, &op_cmp, &am_abs },{ "DEC", 6, &op_dec, &am_abs },{ "xxx", 6, &op_xxx, &am_imp },
-    { "BNE", 2, &op_bne, &am_rel },{ "CMP", 5, &op_cmp, &am_ind_y },{ "xxx", 2, &op_xxx, &am_imp },{ "xxx", 8, &op_xxx, &am_imp },{ "xxx", 4, &op_nop, &am_imp },{ "CMP", 4, &op_cmp, &am_zpg_x },{ "DEC", 6, &op_dec, &am_zpg_x },{ "xxx", 6, &op_xxx, &am_imp },{ "CLD", 2, &op_cld, &am_imp },{ "CMP", 4, &op_cmp, &am_abs_y },{ "NOP", 2, &op_nop, &am_imp },{ "xxx", 7, &op_xxx, &am_imp },{ "xxx", 4, &op_nop, &am_imp },{ "CMP", 4, &op_cmp, &am_abs_x },{ "DEC", 7, &op_dec, &am_abs_x },{ "xxx", 7, &op_xxx, &am_imp },
-    { "CPX", 2, &op_cpx, &am_imm },{ "SBC", 6, &op_sbc, &am_x_ind },{ "xxx", 2, &op_nop, &am_imp },{ "xxx", 8, &op_xxx, &am_imp },{ "CPX", 3, &op_cpx, &am_zpg },{ "SBC", 3, &op_sbc, &am_zpg },{ "INC", 5, &op_inc, &am_zpg },{ "xxx", 5, &op_xxx, &am_imp },{ "INX", 2, &op_inx, &am_imp },{ "SBC", 2, &op_sbc, &am_imm },{ "NOP", 2, &op_nop, &am_imp },{ "xxx", 2, &op_sbc, &am_imp },{ "CPX", 4, &op_cpx, &am_abs },{ "SBC", 4, &op_sbc, &am_abs },{ "INC", 6, &op_inc, &am_abs },{ "xxx", 6, &op_xxx, &am_imp },
-    { "BEQ", 2, &op_beq, &am_rel },{ "SBC", 5, &op_sbc, &am_ind_y },{ "xxx", 2, &op_xxx, &am_imp },{ "xxx", 8, &op_xxx, &am_imp },{ "xxx", 4, &op_nop, &am_imp },{ "SBC", 4, &op_sbc, &am_zpg_x },{ "INC", 6, &op_inc, &am_zpg_x },{ "xxx", 6, &op_xxx, &am_imp },{ "SED", 2, &op_sed, &am_imp },{ "SBC", 4, &op_sbc, &am_abs_y },{ "NOP", 2, &op_nop, &am_imp },{ "xxx", 7, &op_xxx, &am_imp },{ "xxx", 4, &op_nop, &am_imp },{ "SBC", 4, &op_sbc, &am_abs_x },{ "INC", 7, &op_inc, &am_abs_x },{ "xxx", 7, &op_xxx, &am_imp }
+    { "BRK", 7, &op_brk, &am_imm },{ "ORA", 6, &op_ora, &am_x_ind },{ "KIL", 2, &op_kil, &am_imp },{ "SLO", 8, &op_slo, &am_x_ind },{ "NOP", 3, &op_nop, &am_zpg },{ "ORA", 3, &op_ora, &am_zpg },{ "ASL", 5, &op_asl, &am_zpg },{ "SLO", 5, &op_slo, &am_zpg },{ "PHP", 3, &op_php, &am_imp },{ "ORA", 2, &op_ora, &am_imm },{ "ASL", 2, &op_asl, &am_imp },{ "ANC", 2, &op_anc, &am_imm },{ "NOP", 4, &op_nop, &am_abs },{ "ORA", 4, &op_ora, &am_abs },{ "ASL", 6, &op_asl, &am_abs },{ "SLO", 6, &op_slo, &am_abs },
+    { "BPL", 2, &op_bpl, &am_rel },{ "ORA", 5, &op_ora, &am_ind_y },{ "KIL", 2, &op_kil, &am_imp },{ "SLO", 8, &op_slo, &am_ind_y },{ "NOP", 4, &op_nop, &am_zpx },{ "ORA", 4, &op_ora, &am_zpx },{ "ASL", 6, &op_asl, &am_zpx },{ "SLO", 6, &op_slo, &am_zpx },{ "CLC", 2, &op_clc, &am_imp },{ "ORA", 4, &op_ora, &am_aby },{ "NOP", 2, &op_nop, &am_imp },{ "SLO", 7, &op_slo, &am_aby },{ "NOP", 4, &op_nop, &am_abx },{ "ORA", 4, &op_ora, &am_abx },{ "ASL", 7, &op_asl, &am_abx },{ "SLO", 7, &op_slo, &am_abx },
+    { "JSR", 6, &op_jsr, &am_abs },{ "AND", 6, &op_and, &am_x_ind },{ "KIL", 2, &op_kil, &am_imp },{ "RLA", 8, &op_rla, &am_x_ind },{ "BIT", 3, &op_bit, &am_zpg },{ "AND", 3, &op_and, &am_zpg },{ "ROL", 5, &op_rol, &am_zpg },{ "RLA", 5, &op_rla, &am_zpg },{ "PLP", 4, &op_plp, &am_imp },{ "AND", 2, &op_and, &am_imm },{ "ROL", 2, &op_rol, &am_imp },{ "ANC", 2, &op_anc, &am_imm },{ "BIT", 4, &op_bit, &am_abs },{ "AND", 4, &op_and, &am_abs },{ "ROL", 6, &op_rol, &am_abs },{ "RLA", 6, &op_rla, &am_abs },
+    { "BMI", 2, &op_bmi, &am_rel },{ "AND", 5, &op_and, &am_ind_y },{ "KIL", 2, &op_kil, &am_imp },{ "RLA", 8, &op_rla, &am_ind_y },{ "NOP", 4, &op_nop, &am_zpx },{ "AND", 4, &op_and, &am_zpx },{ "ROL", 6, &op_rol, &am_zpx },{ "RLA", 6, &op_rla, &am_zpx },{ "SEC", 2, &op_sec, &am_imp },{ "AND", 4, &op_and, &am_aby },{ "NOP", 2, &op_nop, &am_imp },{ "RLA", 7, &op_rla, &am_aby },{ "NOP", 4, &op_nop, &am_abx },{ "AND", 4, &op_and, &am_abx },{ "ROL", 7, &op_rol, &am_abx },{ "RLA", 7, &op_rla, &am_abx },
+    { "RTI", 6, &op_rti, &am_imp },{ "EOR", 6, &op_eor, &am_x_ind },{ "KIL", 2, &op_kil, &am_imp },{ "SRE", 8, &op_sre, &am_x_ind },{ "NOP", 3, &op_nop, &am_zpg },{ "EOR", 3, &op_eor, &am_zpg },{ "LSR", 5, &op_lsr, &am_zpg },{ "SRE", 5, &op_sre, &am_zpg },{ "PHA", 3, &op_pha, &am_imp },{ "EOR", 2, &op_eor, &am_imm },{ "LSR", 2, &op_lsr, &am_imp },{ "ALR", 2, &op_alr, &am_imm },{ "JMP", 3, &op_jmp, &am_abs },{ "EOR", 4, &op_eor, &am_abs },{ "LSR", 6, &op_lsr, &am_abs },{ "SRE", 6, &op_sre, &am_abs },
+    { "BVC", 2, &op_bvc, &am_rel },{ "EOR", 5, &op_eor, &am_ind_y },{ "KIL", 2, &op_kil, &am_imp },{ "SRE", 8, &op_sre, &am_ind_y },{ "NOP", 4, &op_nop, &am_zpx },{ "EOR", 4, &op_eor, &am_zpx },{ "LSR", 6, &op_lsr, &am_zpx },{ "SRE", 6, &op_sre, &am_zpx },{ "CLI", 2, &op_cli, &am_imp },{ "EOR", 4, &op_eor, &am_aby },{ "NOP", 2, &op_nop, &am_imp },{ "SRE", 7, &op_sre, &am_aby },{ "NOP", 4, &op_nop, &am_abx },{ "EOR", 4, &op_eor, &am_abx },{ "LSR", 7, &op_lsr, &am_abx },{ "SRE", 7, &op_sre, &am_abx },
+    { "RTS", 6, &op_rts, &am_imp },{ "ADC", 6, &op_adc, &am_x_ind },{ "KIL", 2, &op_kil, &am_imp },{ "RRA", 8, &op_rra, &am_x_ind },{ "NOP", 3, &op_nop, &am_zpg },{ "ADC", 3, &op_adc, &am_zpg },{ "ROR", 5, &op_ror, &am_zpg },{ "RRA", 5, &op_rra, &am_zpg },{ "PLA", 4, &op_pla, &am_imp },{ "ADC", 2, &op_adc, &am_imm },{ "ROR", 2, &op_ror, &am_imp },{ "ARR", 2, &op_arr, &am_imm },{ "JMP", 5, &op_jmp, &am_ind },{ "ADC", 4, &op_adc, &am_abs },{ "ROR", 6, &op_ror, &am_abs },{ "RRA", 6, &op_rra, &am_abs },
+    { "BVS", 2, &op_bvs, &am_rel },{ "ADC", 5, &op_adc, &am_ind_y },{ "KIL", 2, &op_kil, &am_imp },{ "RRA", 8, &op_rra, &am_ind_y },{ "NOP", 4, &op_nop, &am_zpx },{ "ADC", 4, &op_adc, &am_zpx },{ "ROR", 6, &op_ror, &am_zpx },{ "RRA", 6, &op_rra, &am_zpx },{ "SEI", 2, &op_sei, &am_imp },{ "ADC", 4, &op_adc, &am_aby },{ "NOP", 2, &op_nop, &am_imp },{ "RRA", 7, &op_rra, &am_aby },{ "NOP", 4, &op_nop, &am_abx },{ "ADC", 4, &op_adc, &am_abx },{ "ROR", 7, &op_ror, &am_abx },{ "RRA", 7, &op_rra, &am_abx },
+    { "NOP", 2, &op_nop, &am_imm },{ "STA", 6, &op_sta, &am_x_ind },{ "NOP", 2, &op_nop, &am_imm },{ "SAX", 6, &op_sax, &am_x_ind },{ "STY", 3, &op_sty, &am_zpg },{ "STA", 3, &op_sta, &am_zpg },{ "STX", 3, &op_stx, &am_zpg },{ "SAX", 3, &op_sax, &am_zpg },{ "DEY", 2, &op_dey, &am_imp },{ "NOP", 2, &op_nop, &am_imm },{ "TXA", 2, &op_txa, &am_imp },{ "XAA", 2, &op_xaa, &am_imm },{ "STY", 4, &op_sty, &am_abs },{ "STA", 4, &op_sta, &am_abs },{ "STX", 4, &op_stx, &am_abs },{ "SAX", 4, &op_sax, &am_abs },
+    { "BCC", 2, &op_bcc, &am_rel },{ "STA", 6, &op_sta, &am_ind_y },{ "KIL", 2, &op_kil, &am_imp },{ "AHX", 6, &op_ahx, &am_ind_y },{ "STY", 4, &op_sty, &am_zpx },{ "STA", 4, &op_sta, &am_zpx },{ "STX", 4, &op_stx, &am_zpy },{ "SAX", 4, &op_sax, &am_zpx },{ "TYA", 2, &op_tya, &am_imp },{ "STA", 5, &op_sta, &am_aby },{ "TXS", 2, &op_txs, &am_imp },{ "TAS", 5, &op_tas, &am_aby },{ "SHY", 5, &op_shy, &am_abx },{ "STA", 5, &op_sta, &am_abx },{ "SHX", 5, &op_shx, &am_aby },{ "AHX", 5, &op_ahx, &am_aby },
+    { "LDY", 2, &op_ldy, &am_imm },{ "LDA", 6, &op_lda, &am_x_ind },{ "LDX", 2, &op_ldx, &am_imm },{ "LAX", 6, &op_lax, &am_x_ind },{ "LDY", 3, &op_ldy, &am_zpg },{ "LDA", 3, &op_lda, &am_zpg },{ "LDX", 3, &op_ldx, &am_zpg },{ "LAX", 3, &op_lax, &am_zpg },{ "TAY", 2, &op_tay, &am_imp },{ "LDA", 2, &op_lda, &am_imm },{ "TAX", 2, &op_tax, &am_imp },{ "LAX", 2, &op_lax, &am_imm },{ "LDY", 4, &op_ldy, &am_abs },{ "LDA", 4, &op_lda, &am_abs },{ "LDX", 4, &op_ldx, &am_abs },{ "LAX", 4, &op_lax, &am_abs },
+    { "BCS", 2, &op_bcs, &am_rel },{ "LDA", 5, &op_lda, &am_ind_y },{ "KIL", 2, &op_kil, &am_imp },{ "LAX", 5, &op_lax, &am_ind_y },{ "LDY", 4, &op_ldy, &am_zpx },{ "LDA", 4, &op_lda, &am_zpx },{ "LDX", 4, &op_ldx, &am_zpy },{ "LAX", 4, &op_lax, &am_zpx },{ "CLV", 2, &op_clv, &am_imp },{ "LDA", 4, &op_lda, &am_aby },{ "TSX", 2, &op_tsx, &am_imp },{ "LAS", 4, &op_las, &am_aby },{ "LDY", 4, &op_ldy, &am_abx },{ "LDA", 4, &op_lda, &am_abx },{ "LDX", 4, &op_ldx, &am_aby },{ "LAX", 4, &op_lax, &am_aby },
+    { "CPY", 2, &op_cpy, &am_imm },{ "CMP", 6, &op_cmp, &am_x_ind },{ "NOP", 2, &op_nop, &am_imm },{ "DCP", 8, &op_dcp, &am_x_ind },{ "CPY", 3, &op_cpy, &am_zpg },{ "CMP", 3, &op_cmp, &am_zpg },{ "DEC", 5, &op_dec, &am_zpg },{ "DCP", 5, &op_dcp, &am_zpg },{ "INY", 2, &op_iny, &am_imp },{ "CMP", 2, &op_cmp, &am_imm },{ "DEX", 2, &op_dex, &am_imp },{ "AXS", 2, &op_axs, &am_imm },{ "CPY", 4, &op_cpy, &am_abs },{ "CMP", 4, &op_cmp, &am_abs },{ "DEC", 6, &op_dec, &am_abs },{ "DCP", 6, &op_dcp, &am_abs },
+    { "BNE", 2, &op_bne, &am_rel },{ "CMP", 5, &op_cmp, &am_ind_y },{ "KIL", 2, &op_kil, &am_imp },{ "DCP", 8, &op_dcp, &am_ind_y },{ "NOP", 4, &op_nop, &am_zpx },{ "CMP", 4, &op_cmp, &am_zpx },{ "DEC", 6, &op_dec, &am_zpx },{ "DCP", 6, &op_dcp, &am_zpx },{ "CLD", 2, &op_cld, &am_imp },{ "CMP", 4, &op_cmp, &am_aby },{ "NOP", 2, &op_nop, &am_imp },{ "DCP", 7, &op_dcp, &am_aby },{ "NOP", 4, &op_nop, &am_abx },{ "CMP", 4, &op_cmp, &am_abx },{ "DEC", 7, &op_dec, &am_abx },{ "DCP", 7, &op_dcp, &am_abx },
+    { "CPX", 2, &op_cpx, &am_imm },{ "SBC", 6, &op_sbc, &am_x_ind },{ "NOP", 2, &op_nop, &am_imm },{ "ISC", 8, &op_isc, &am_x_ind },{ "CPX", 3, &op_cpx, &am_zpg },{ "SBC", 3, &op_sbc, &am_zpg },{ "INC", 5, &op_inc, &am_zpg },{ "ISC", 5, &op_isc, &am_zpg },{ "INX", 2, &op_inx, &am_imp },{ "SBC", 2, &op_sbc, &am_imm },{ "NOP", 2, &op_nop, &am_imp },{ "SBC", 2, &op_sbc, &am_imm },{ "CPX", 4, &op_cpx, &am_abs },{ "SBC", 4, &op_sbc, &am_abs },{ "INC", 6, &op_inc, &am_abs },{ "ISC", 6, &op_isc, &am_abs },
+    { "BEQ", 2, &op_beq, &am_rel },{ "SBC", 5, &op_sbc, &am_ind_y },{ "KIL", 2, &op_kil, &am_imp },{ "ISC", 8, &op_isc, &am_ind_y },{ "NOP", 4, &op_nop, &am_zpx },{ "SBC", 4, &op_sbc, &am_zpx },{ "INC", 6, &op_inc, &am_zpx },{ "ISC", 6, &op_isc, &am_zpx },{ "SED", 2, &op_sed, &am_imp },{ "SBC", 4, &op_sbc, &am_aby },{ "NOP", 2, &op_nop, &am_imp },{ "ISC", 7, &op_isc, &am_aby },{ "NOP", 4, &op_nop, &am_abx },{ "SBC", 4, &op_sbc, &am_abx },{ "INC", 7, &op_inc, &am_abx },{ "ISC", 7, &op_isc, &am_abx }
 };
 
 
@@ -643,7 +753,7 @@ void cpu_reset(cpu_t *cpu) {
     cpu->a = 0;
     cpu->x = 0;
     cpu->y = 0;
-    cpu->sp = 0xFF;
+    cpu->sp = 0xFD; /* see http://users.telenet.be/kim1-6502/6502/proman.html#92 */
     cpu->status = STATUS_U | STATUS_B;
 
     /* TODO(shaw): the reset vector is 0xFFFC, 0xFFFD on startup the cpu would
