@@ -55,12 +55,18 @@ uint16_t am_imm(cpu_t *cpu) {
     return cpu->pc++;
 }
 
+/*
+ * The 6502 had a hardware bug where the indirect jmp, if on a page boundary
+ * like $xxFF would wrap around to $xx00 instead of the intended crossing of
+ * the page boundary.  see http://archive.6502.org/publications/6502notes/6502_user_notes_15.pdf#page=24
+ */
 uint16_t am_ind(cpu_t *cpu) {
     word_t addr, pointer;
     pointer.byte.l = bus_read(cpu->pc++);
     pointer.byte.h = bus_read(cpu->pc++);
     addr.byte.l = bus_read(pointer.w);
-    addr.byte.h = bus_read(pointer.w+1);
+    uint16_t ptr_high_byte = pointer.byte.l == 0xFF ? pointer.w & 0xFF00 : pointer.w + 1;
+    addr.byte.h = bus_read(ptr_high_byte);
     return addr.w;
 }
 
