@@ -850,6 +850,7 @@ void cpu_reset(cpu_t *cpu) {
     cpu->running = true;
 }
 
+#ifdef DEBUG_LOG
 void debug_log_instruction(cpu_t *cpu) {
     assert(logfile && "logfile is not defined or could not be opened");
 
@@ -954,6 +955,7 @@ void debug_log_instruction(cpu_t *cpu) {
     fprintf(logfile, "%.4X  %.2X %-5s  %3s %-26s  A:%.2X X:%.2X Y:%.2X P:%.2X SP:%.2X\n",
         cpu->pc-1, cpu->opcode, operands, op.name, decoded, cpu->a, cpu->x, cpu->y, cpu->status, cpu->sp);
 }
+#endif
 
 void cpu_tick(cpu_t *cpu) {
     cpu->opcode = bus_read(cpu->pc++);
