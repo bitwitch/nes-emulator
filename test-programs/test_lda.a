@@ -37,8 +37,20 @@ LDA #3
 STA $00F0
 LDA #0
 STA $00F1
+LDX #1
 LDA ($EF,X)
 STA $0009
+
+; (indirect,X)   zero-page wraps
+LDA #$77
+STA $5003
+LDA #$03
+STA $00FF
+LDA #$50
+STA $0100
+LDX #1
+LDA ($FF,X)
+STA $000A
 
 ; (indirect),Y
 LDA #5
@@ -46,5 +58,15 @@ STA $00F2
 LDA #0
 STA $00F3
 LDA ($F2),Y
-STA $000A
+STA $000B
+
+; (indirect),Y     zero-page wraps
+LDA #$69
+STA $0107
+LDA #5
+STA $00FF
+LDA #0
+STA $0100
+LDA ($FF),Y
+STA $000C
 

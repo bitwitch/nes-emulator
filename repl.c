@@ -9,6 +9,12 @@
 #define MAX_TOKENS 32
 
 
+#ifdef DEBUG_LOG
+FILE *logfile;
+#endif
+
+
+
 void print_cpu_state(cpu_t *cpu) {
     printf("PC\t\tA\t\tX\t\tY\t\tSP\t\tN V _ B D I Z C\n"); 
     printf("0x%.4X\t\t0x%.2X\t\t0x%.2X\t\t0x%.2X\t\t0x%2X\t\t%d %d %d %d %d %d %d %d\n", cpu->pc, cpu->a, cpu->x, cpu->y, cpu->sp, (cpu->status >> 7) & 1, (cpu->status >> 6) & 1, (cpu->status >> 5) & 1, (cpu->status >> 4) & 1, (cpu->status >> 3) & 1, (cpu->status >> 2) & 1, (cpu->status >> 1) & 1, (cpu->status >> 0) & 1);
@@ -151,6 +157,7 @@ int execute_command(cpu_t *cpu, char **tokens) {
                 cart_t cart = ines_read(filepath);
                 load_memory(address, cart.prg_rom, CART_PRG_ROM_SIZE(cart.header));
                 delete_cart(&cart);
+                cpu_reset(cpu);
             } else {
 
                 FILE *fp = fopen(filepath, "r");
@@ -268,6 +275,11 @@ void init_test_asm(void) {
     execute command
 */
 int repl(void) {
+
+#ifdef DEBUG_LOG
+    logfile = fopen("nestest.log", "w");
+#endif
+
     cpu_t cpu;
     cpu_reset(&cpu);
 
@@ -293,6 +305,12 @@ int repl(void) {
     }
 
     free(command);
+
+#ifdef DEBUG_LOG
+    if (logfile)
+        fclose(logfile);
+#endif
+
 
     return rc;
 }
