@@ -20,15 +20,15 @@ void print_cpu_state(cpu_t *cpu) {
     printf("0x%.4X\t\t0x%.2X\t\t0x%.2X\t\t0x%.2X\t\t0x%2X\t\t%d %d %d %d %d %d %d %d\n", cpu->pc, cpu->a, cpu->x, cpu->y, cpu->sp, (cpu->status >> 7) & 1, (cpu->status >> 6) & 1, (cpu->status >> 5) & 1, (cpu->status >> 4) & 1, (cpu->status >> 3) & 1, (cpu->status >> 2) & 1, (cpu->status >> 1) & 1, (cpu->status >> 0) & 1);
 }
 
-int get_command(char *command, size_t *len, char **tokens) {
-    ssize_t result = getline(&command, len, stdin);
+int get_command(char **command, size_t *len, char **tokens) {
+    ssize_t result = getline(command, len, stdin);
 
     if (result < 0)
         return result;
 
     int tok_num = 0;
     char **current = tokens;
-    *current = strtok(command, " \r\n");
+    *current = strtok(*command, " \r\n");
 
     while (*current != NULL) {
         ++tok_num;
@@ -284,7 +284,7 @@ int repl(void) {
     cpu_reset(&cpu);
 
     size_t command_size = 64;
-    char *command = malloc(command_size * sizeof(char));
+    char *command = malloc(command_size * sizeof(char)); 
     char *tokens[MAX_TOKENS];
     int quit = 0;
     int rc = 0;
@@ -295,7 +295,7 @@ int repl(void) {
         print_cpu_state(&cpu);
         printf("\n> ");
 
-        if (get_command(command, &command_size, tokens) < 0) {
+        if (get_command(&command, &command_size, tokens) < 0) {
             fprintf(stderr, "Error: failed to read command: %s\n", strerror(errno));
             rc = 1;
             break;

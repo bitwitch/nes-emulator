@@ -582,15 +582,13 @@ uint8_t op_rts(cpu_t *cpu, uint16_t addr) {
 }
 
 uint8_t op_sbc(cpu_t *cpu, uint16_t addr) {
-    uint8_t operand = bus_read(addr);
-    uint8_t same_sign = (cpu->a & 0x80) == ((~operand) & 0x80);
-    uint8_t carry = get_flag(cpu, STATUS_C);
-    uint16_t temp = cpu->a + ~operand + carry;
-    uint8_t set_carry = cpu->a >= operand - !carry;
+    uint8_t operand = bus_read(addr) ^ 0xFF;
+    uint8_t same_sign = (cpu->a & 0x80) == (operand & 0x80);
+    uint16_t temp = cpu->a + operand + get_flag(cpu, STATUS_C);
     cpu->a = temp & 0xFF;
-    uint8_t overflow = same_sign && (cpu->a & 0x80) != ((~operand) & 0x80);
+    uint8_t overflow = same_sign && (cpu->a & 0x80) != (operand & 0x80);
 
-    set_flag(cpu, STATUS_C, set_carry);
+    set_flag(cpu, STATUS_C, (temp & 0x100) >> 8);
     set_flag(cpu, STATUS_Z, cpu->a == 0);
     set_flag(cpu, STATUS_N, cpu->a >> 7);
     set_flag(cpu, STATUS_V, overflow);
@@ -772,14 +770,13 @@ uint8_t op_isc(cpu_t *cpu, uint16_t addr) {
     uint8_t inc_result = bus_read(addr) + 1;
     bus_write(addr, inc_result);
 
-    uint8_t same_sign = (cpu->a & 0x80) == ((~inc_result) & 0x80);
-    uint8_t carry = get_flag(cpu, STATUS_C);
-    uint16_t temp = cpu->a + ~inc_result + carry;
-    uint8_t set_carry = cpu->a >= inc_result - !carry;
+    inc_result ^= 0xFF;
+    uint8_t same_sign = (cpu->a & 0x80) == (inc_result & 0x80);
+    uint16_t temp = cpu->a + inc_result + get_flag(cpu, STATUS_C);
     cpu->a = temp & 0xFF;
-    uint8_t overflow = same_sign && (cpu->a & 0x80) != ((~inc_result) & 0x80);
+    uint8_t overflow = same_sign && (cpu->a & 0x80) != (inc_result & 0x80);
 
-    set_flag(cpu, STATUS_C, set_carry);
+    set_flag(cpu, STATUS_C, (temp & 0x100) >> 8);
     set_flag(cpu, STATUS_Z, cpu->a == 0);
     set_flag(cpu, STATUS_N, cpu->a >> 7);
     set_flag(cpu, STATUS_V, overflow);
@@ -806,9 +803,13 @@ uint8_t op_alr(cpu_t *cpu, uint16_t addr) {
 uint8_t op_arr(cpu_t *cpu, uint16_t addr) {
     cpu->a &= bus_read(addr);
 
-    uint8_t old_c = get_flag(cpu, STATUS_C);
-    set_flag(cpu, STATUS_C, cpu->a & 1);
-    cpu->a = (old_c << 7) | (cpu->a >> 1);
+    uint8_t c = get_flag(cpu, STATUS_C);
+    cpu->a = (c << 7) | (cpu->a >> 1);
+
+    bool bit6 = (cpu->a >> 6) & 1;
+    bool bit5 = (cpu->a >> 5) & 1;
+    set_flag(cpu, STATUS_C, bit6);
+    set_flag(cpu, STATUS_V, bit5^bit6);
     set_flag(cpu, STATUS_N, cpu->a >> 7);
     set_flag(cpu, STATUS_Z, cpu->a == 0);
     return 0;
@@ -840,14 +841,14 @@ uint8_t op_ahx(cpu_t *cpu, uint16_t addr) {
 }
 
 uint8_t op_shy(cpu_t *cpu, uint16_t addr) {
-    word_t h = { .w = addr+1 };
-    bus_write(addr, cpu->y & h.byte.h);
+    word_t h = { .w = addr };
+    bus_write(addr, cpu->y & (h.byte.h + 1));
     return 0;
 }
 
 uint8_t op_shx(cpu_t *cpu, uint16_t addr) {
-    word_t h = { .w = addr+1 };
-    bus_write(addr, cpu->x & h.byte.h);
+    word_t h = { .w = addr };
+    bus_write(addr, cpu->x & (h.byte.h + 1));
     return 0;
 }
 
@@ -1022,6 +1023,18 @@ void debug_log_instruction(cpu_t *cpu) {
         cpu->pc-1, cpu->opcode, operands, op.name, decoded, cpu->a, cpu->x, cpu->y, cpu->status, cpu->sp);
 }
 #endif
+
+void print_message_at(uint16_t addr) {
+    uint8_t buf[256] = {0};
+    int i = 0;
+    uint8_t data;
+    do {
+        data = bus_read(addr++);
+        buf[i++] = data;
+    } while(data);
+
+    printf("Message:\n%s\n", buf);
+}
 
 void cpu_tick(cpu_t *cpu) {
     cpu->opcode = bus_read(cpu->pc++);
