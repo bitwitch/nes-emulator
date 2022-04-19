@@ -38,6 +38,8 @@ typedef enum {
     STATUS_N = 1 << 7
 } status_mask_t;
 
+void cpu_irq(cpu_t *cpu);
+void cpu_nmi(cpu_t *cpu);
 
 void cpu_tick(cpu_t *cpu);  /* executes a single instruction */
 int cpu_run(cpu_t *cpu);

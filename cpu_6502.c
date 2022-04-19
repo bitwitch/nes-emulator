@@ -23,6 +23,51 @@ void set_flag(cpu_t *cpu, status_mask_t flag, bool value) {
     cpu->status = value ? cpu->status | flag : cpu->status & (~flag);
 }
 
+
+/****************************************************************************/
+/* interrupts */
+/****************************************************************************/
+void cpu_irq(cpu_t *cpu) {
+    if (get_flag(cpu, STATUS_I))
+        return;
+
+    /* push pc */
+    word_t return_addr = { .w = cpu->pc };
+    bus_write(0x100 | cpu->sp, return_addr.byte.h);
+    --cpu->sp;
+    bus_write(0x100 | cpu->sp, return_addr.byte.l);
+    --cpu->sp;
+
+    /* push status */
+    bus_write(0x100 | cpu->sp, (cpu->status|STATUS_U) & ~STATUS_B);
+    --cpu->sp;
+
+    /* jump to interrupt handler */
+    cpu->pc = bus_read(0xFFFA) | (bus_read(0xFFFB) << 8);
+
+    /* set interrupt disable */
+    set_flag(cpu, STATUS_I, 1);
+}
+
+void cpu_nmi(cpu_t *cpu) {
+    /* push pc */
+    word_t return_addr = { .w = cpu->pc };
+    bus_write(0x100 | cpu->sp, return_addr.byte.h);
+    --cpu->sp;
+    bus_write(0x100 | cpu->sp, return_addr.byte.l);
+    --cpu->sp;
+
+    /* push status */
+    bus_write(0x100 | cpu->sp, (cpu->status|STATUS_U) & ~STATUS_B);
+    --cpu->sp;
+
+    /* jump to interrupt handler */
+    cpu->pc = bus_read(0xFFFE) | (bus_read(0xFFFF) << 8);
+
+    /* set interrupt disable */
+    set_flag(cpu, STATUS_I, 1);
+}
+
 /****************************************************************************/
 /* address modes */
 /****************************************************************************/
@@ -220,8 +265,28 @@ uint8_t op_bpl(cpu_t *cpu, uint16_t addr) {
 
 uint8_t op_brk(cpu_t *cpu, uint16_t addr) {
     (void)addr;
+
     /* TODO(shaw): this is just a hack to get the repl working, need to actually implement BRK */
-    cpu->running = false;
+    /*cpu->running = false;*/
+
+    /* push pc+2 (two bytes after the opcode, leaving one byte for a break mark 
+     * one is used below because the opcode has already been read */
+    word_t return_addr = { .w = cpu->pc+1 };
+    bus_write(0x100 | cpu->sp, return_addr.byte.h);
+    --cpu->sp;
+    bus_write(0x100 | cpu->sp, return_addr.byte.l);
+    --cpu->sp;
+
+    /* push status, with break flag set */
+    bus_write(0x100 | cpu->sp, cpu->status|STATUS_U|STATUS_B);
+    --cpu->sp;
+
+    /* jump to interrupt handler */
+    cpu->pc = bus_read(0xFFFE) | (bus_read(0xFFFF) << 8);
+
+    /* set interrupt disable */
+    set_flag(cpu, STATUS_I, 1);
+
     return 0;
 }
 
@@ -841,8 +906,9 @@ void cpu_reset(cpu_t *cpu) {
     /* TODO(shaw): the reset vector is 0xFFFC, 0xFFFD on startup the cpu would
      * read the values at these locations into pc and perform a JMP. For now
      * i'm just hardcoding the pc to a value */
-    cpu->pc = 0xC000;
-    /*cpu->pc = bus_read(0xFFFC) | (bus_read(0xFFFD) << 8);*/
+    /*cpu->pc = 0xC000;*/
+
+    cpu->pc = bus_read(0xFFFC) | (bus_read(0xFFFD) << 8);
 
     cpu->interrupt_period = 1;
     cpu->cycle_counter = cpu->interrupt_period;
