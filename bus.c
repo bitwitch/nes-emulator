@@ -15,8 +15,8 @@ void init_memory(void) {
     /*memory[addr++] = 0x00; [> BRK <]*/
 }
 
-void load_memory(uint16_t addr, uint8_t *data, uint16_t size) {
-    assert(addr + size <= MAX_MEMORY);
+void load_memory(uint16_t addr, uint8_t *data, uint32_t size) {
+    assert(addr + size <= (uint32_t)MAX_MEMORY);
     memcpy(&memory[addr], data, size);
 }
 
