@@ -1,0 +1,69 @@
+#include <SDL2/SDL.h>
+#include <signal.h>
+
+#include "io.h"
+
+static SDL_Renderer *renderer;
+static SDL_Texture  *texture;
+static uint32_t     *pixels;
+
+uint32_t *io_init(void) {
+    if (SDL_Init(SDL_INIT_VIDEO) < 0) {
+        printf("Failed to initialize SDL: %s\n", SDL_GetError());
+        exit(1);
+    }
+
+    SDL_Window *window = SDL_CreateWindow(
+        "NES",
+        SDL_WINDOWPOS_UNDEFINED,
+        SDL_WINDOWPOS_UNDEFINED,
+        3*WIDTH, 3*HEIGHT,
+        SDL_WINDOW_RESIZABLE);
+    if (!window) {
+        fprintf(stderr, "Failed to create window: %s\n", SDL_GetError());
+        exit(1);
+    }
+
+    SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "linear");
+
+    renderer = SDL_CreateRenderer(window, -1, 0);
+    if (!renderer) {
+        fprintf(stderr, "Failed to create renderer: %s\n", SDL_GetError());
+        exit(1);
+    }
+
+    pixels = malloc(WIDTH * HEIGHT * sizeof(uint32_t)); /* LEAK */
+    if (!pixels) {
+        perror("malloc");
+        exit(1);
+    }
+
+    texture = SDL_CreateTexture(renderer,
+       SDL_PIXELFORMAT_ARGB8888,
+       SDL_TEXTUREACCESS_STREAMING,
+       WIDTH, HEIGHT);
+    if (!texture) {
+        fprintf(stderr, "Failed to create texture: %s\n", SDL_GetError());
+        exit(1);
+    }
+
+    signal(SIGINT, SIG_DFL);
+
+    return pixels;
+}
+
+void draw(void) {
+    SDL_RenderClear(renderer);
+    /*  upload pixel data to GPU */
+    SDL_UpdateTexture(texture, NULL, pixels, WIDTH * sizeof(uint32_t));
+    SDL_RenderCopy(renderer, texture, NULL, NULL);
+    SDL_RenderPresent(renderer);
+}
+
+void io_deinit(void) {
+    if (pixels) free(pixels);
+}
+
+
+/* TODO(shaw): put_pixel function */
+

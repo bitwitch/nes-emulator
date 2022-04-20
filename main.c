@@ -3,6 +3,7 @@
 #include "cpu_6502.h"
 #include "bus.h"
 #include "cart.h"
+#include "io.h"
 
 #ifdef DEBUG_LOG
 extern FILE *logfile;
@@ -17,7 +18,7 @@ int main(int argc, char **argv) {
     cpu_t cpu;
     read_rom_file(argv[1]);
     cpu_reset(&cpu);
-    /*io_init();*/
+    uint32_t *pixels = io_init();
 
 #ifdef DEBUG_LOG
     logfile = fopen("nestest.log", "w");
@@ -27,12 +28,15 @@ int main(int argc, char **argv) {
         /* get input */
 
         /* update */
-        /*if (step_pressed)*/
-        cpu_tick(&cpu);
+        /*cpu_tick(&cpu);*/
+
+        for (int i=0; i<WIDTH*HEIGHT; ++i) {
+            uint8_t val = rand() % 256;
+            pixels[i] = (val << 16) | (val << 8) | val;
+        }
 
         /* draw */
-
-        /* draw nes */
+        draw();
 
         /* draw debug stuff */
             /* cpu state */
@@ -41,6 +45,7 @@ int main(int argc, char **argv) {
     }
 
     /* just let OS clean it up
+     * io_deinit();
      * delete_cart(&cart);
      */
 
