@@ -21,14 +21,16 @@
     more info: https://www.nesdev.org/wiki/INES
 */
 
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h> 
 #include <string.h>
 #include <errno.h>
 #include "cart.h"
 
-cart_t ines_read(char *filepath) {
-    cart_t cart = {0};
+static cart_t cart;
+
+void read_rom_file(char *filepath) {
     FILE *fp = fopen(filepath, "rb");
     if (!fp) {
         fprintf(stderr, "Failed to open %s: %s\n", filepath, strerror(errno));
@@ -47,14 +49,18 @@ cart_t ines_read(char *filepath) {
         exit(1);
     }
 
-    uint32_t prg_rom_size = CART_PRG_ROM_SIZE(cart.header);
-    uint32_t chr_rom_size = CART_CHR_ROM_SIZE(cart.header);
-    cart.prg_rom = malloc(prg_rom_size * sizeof(uint8_t));
-    cart.chr_rom = malloc(chr_rom_size * sizeof(uint8_t));
+    uint32_t prg_rom_size = PRG_ROM_SIZE(cart.header);
+    uint32_t chr_rom_size = CHR_ROM_SIZE(cart.header);
+    cart.prg_rom = malloc(prg_rom_size);
+    cart.chr_rom = malloc(chr_rom_size);
+    /* TODO(shaw): this will probably depend on mapper */
+    cart.prg_ram = malloc(8192); 
+
+    printf("%u * 16kB ROM, %u * 8kB VROM, mapper %u, ctrlbyte %02X\n", PRG_ROM_BANKS(cart.header), CHR_ROM_BANKS(cart.header), MAPPER(cart.header), CONTROL_BYTE(cart.header));
 
     /* ignore trainer for now */
     /* TODO(shaw): implement trainer ?? */
-    if (CART_TRAINER(cart.header)) {
+    if (TRAINER(cart.header)) {
         printf("Warning: cart contains trainer but this emulator does not support them.\n");
         if(fseek(fp, 512, SEEK_CUR) < 0) {
             perror("fseek");
@@ -79,12 +85,36 @@ cart_t ines_read(char *filepath) {
      * is load a 6502 test file to test my 6502 emulator */
        
     if (fp) fclose(fp);
-    return cart;
 }
 
-void delete_cart(cart_t *cart) {
-    free(cart->prg_rom);
-    free(cart->chr_rom);
+void delete_cart() {
+    free(cart.prg_rom);
+    free(cart.chr_rom);
+    free(cart.prg_ram);
+    memset(&cart, 0, sizeof(cart_t));
 }
+
+uint8_t cart_read(uint16_t addr) {
+    /* TODO(shaw): map out cart address space */
+
+    if (addr < 0x6000)
+        assert(0 && "this part of cart memory not implemented");
+    else if (addr < 0x8000)
+        return cart.prg_ram[addr - 0x6000];
+    else 
+        return cart.prg_rom[addr - 0xC000];
+}
+
+void cart_write(uint16_t addr, uint8_t data) {
+    /* TODO(shaw): map out cart address space */
+    if (addr < 0x6000)
+        assert(0 && "this part of cart memory not implemented");
+    if (addr < 0x8000)
+        cart.prg_ram[addr - 0x6000] = data;
+    else 
+        cart.prg_rom[addr - 0xC000] = data;
+
+}
+
 
 

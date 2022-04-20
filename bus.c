@@ -2,33 +2,62 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "cart.h"
+
 #define MAX_MEMORY 65536
 
-static uint8_t memory[MAX_MEMORY];
+static uint8_t cpu_ram[2048];
 
-void init_memory(void) {
-    /*uint16_t addr = 0;*/
-    /*memory[addr++] = 0x69; [> ADC #$1 <]*/
-    /*memory[addr++] = 0x01;*/
-    /*memory[addr++] = 0x69; [> ADC #$1 <]*/
-    /*memory[addr++] = 0x01;*/
-    /*memory[addr++] = 0x00; [> BRK <]*/
+
+
+/* FIXME: */
+uint8_t ppu_read(uint16_t addr) {
+    (void)addr;
+    return 0;
+}
+void ppu_write(uint16_t addr, uint8_t data) {
+    (void)addr; (void)data;
 }
 
-void load_memory(uint16_t addr, uint8_t *data, uint32_t size) {
-    assert(addr + size <= (uint32_t)MAX_MEMORY);
-    memcpy(&memory[addr], data, size);
-}
+/*
+    Memory map
 
+    Adress Range    size    device
+    ------------    -----   ------
+    $0000-$07FF 	$0800 	2KB internal RAM
+    $0800-$0FFF 	$0800 	Mirrors of $0000-$07FF
+    $1000-$17FF 	$0800   ""
+    $1800-$1FFF 	$0800   ""
+    $2000-$2007 	$0008 	NES PPU registers
+    $2008-$3FFF 	$1FF8 	Mirrors of $2000-2007 (repeats every 8 bytes)
+    $4000-$4017 	$0018 	NES APU and I/O registers
+    $4018-$401F 	$0008 	APU and I/O functionality that is normally disabled. See CPU Test Mode on nesdev.
+    $4020-$FFFF 	$BFE0 	Cartridge space: PRG ROM, PRG RAM, and mapper registers 
+
+    from: https://www.nesdev.org/wiki/CPU_memory_map
+*/
 uint8_t bus_read(uint16_t addr) {
-    return memory[addr];
+    if (addr < 0x2000)
+        return cpu_ram[addr & 0x7FF];
+    else if (addr < 0x4000)
+        return ppu_read(addr);
+    else if (addr < 0x4020) {
+        /* apu or i/o */
+    } 
+    else 
+        return cart_read(addr);
+    return 0;
 }
 
 void bus_write(uint16_t addr, uint8_t data) {
-    memory[addr] = data;
+    if (addr < 0x2000)
+        cpu_ram[addr & 0x7FF] = data;
+    else if (addr < 0x4000)
+        ppu_write(addr, data);
+    else if (addr < 0x4020) {
+        /* apu or i/o */
+    } 
+    else 
+        cart_write(addr, data);
 }
-
-
-
-
 

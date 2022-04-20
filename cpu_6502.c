@@ -3,7 +3,7 @@
 #include "cpu_6502.h"
 
 #ifdef DEBUG_LOG
-extern FILE *logfile;
+FILE *logfile;
 #endif
 
 typedef union {
@@ -14,14 +14,6 @@ typedef union {
     struct { uint8_t l,h; } byte;
 #endif
 } word_t;
-
-uint8_t get_flag(cpu_t *cpu, status_mask_t flag) {
-    return (cpu->status & flag) != 0;
-}
-
-void set_flag(cpu_t *cpu, status_mask_t flag, bool value) {
-    cpu->status = value ? cpu->status | flag : cpu->status & (~flag);
-}
 
 
 /****************************************************************************/
@@ -890,6 +882,14 @@ op_t ops[OP_COUNT] =
 };
 
 
+uint8_t get_flag(cpu_t *cpu, status_mask_t flag) {
+    return (cpu->status & flag) != 0;
+}
+
+void set_flag(cpu_t *cpu, status_mask_t flag, bool value) {
+    cpu->status = value ? cpu->status | flag : cpu->status & (~flag);
+}
+
 void cpu_reset(cpu_t *cpu) {
     cpu->a = 0;
     cpu->x = 0;
@@ -907,9 +907,9 @@ void cpu_reset(cpu_t *cpu) {
     /* TODO(shaw): the reset vector is 0xFFFC, 0xFFFD on startup the cpu would
      * read the values at these locations into pc and perform a JMP. For now
      * i'm just hardcoding the pc to a value */
-    /*cpu->pc = 0xC000;*/
+    cpu->pc = 0xC000;
 
-    cpu->pc = bus_read(0xFFFC) | (bus_read(0xFFFD) << 8);
+    /*cpu->pc = bus_read(0xFFFC) | (bus_read(0xFFFD) << 8);*/
 
     cpu->interrupt_period = 1;
     cpu->cycle_counter = cpu->interrupt_period;
@@ -1036,6 +1036,16 @@ void print_message_at(uint16_t addr) {
     printf("Message:\n%s\n", buf);
 }
 
+void print_cpu_state(cpu_t *cpu) {
+    printf("PC\t\tA\t\tX\t\tY\t\tSP\t\tN V _ B D I Z C\n"); 
+    printf("0x%.4X\t\t0x%.2X\t\t0x%.2X\t\t0x%.2X\t\t0x%2X\t\t%d %d %d %d %d %d %d %d\n", 
+        cpu->pc, cpu->a, cpu->x, cpu->y, cpu->sp, (cpu->status >> 7) & 1, 
+        (cpu->status >> 6) & 1, (cpu->status >> 5) & 1, (cpu->status >> 4) & 1, 
+        (cpu->status >> 3) & 1, (cpu->status >> 2) & 1, (cpu->status >> 1) & 1, 
+        (cpu->status >> 0) & 1);
+}
+
+
 void cpu_tick(cpu_t *cpu) {
     cpu->opcode = bus_read(cpu->pc++);
     op_t op = ops[cpu->opcode];
@@ -1048,33 +1058,4 @@ void cpu_tick(cpu_t *cpu) {
     op.execute(cpu, addr);
 }
 
-int cpu_run(cpu_t *cpu) {
-    uint16_t addr;
-    op_t op;
-    cpu->running = true;
-
-    while (cpu->running) {
-        cpu->opcode = bus_read(cpu->pc++);
-        op = ops[cpu->opcode];
-
-#ifdef DEBUG_LOG
-        debug_log_instruction(cpu);
-#endif
-
-        addr = op.addr_mode(cpu);
-        op.execute(cpu, addr);
-
-        /*cpu->cycle_counter -= op.cycles;*/
-
-        /*if (cpu->cycle_counter <= 0) {*/
-            /*[> Check for interrupts and do other <]*/
-            /*[> cyclic tasks here                 <]*/
-
-            /*cpu->cycle_counter += cpu->interrupt_period;*/
-            /*if (exit_required) break;*/
-        /*}*/
-    }
-
-    return 0;
-}
 

@@ -231,43 +231,6 @@ int execute_command(cpu_t *cpu, char **tokens) {
 }
 
 
-void init_test_asm(void) {
-    bus_write(0xC000, 0xA9); /* lda #$69 */
-    bus_write(0xC001, 0x69); 
-
-    bus_write(0xC002, 0x85); /* sta $03 */
-    bus_write(0xC003, 0x03);
-
-    bus_write(0xC004, 0xA2); /* ldx #$42 */
-    bus_write(0xC005, 0x01); 
-
-    bus_write(0xC006, 0x85); /* sta $03 */
-    bus_write(0xC007, 0x03);
-
-
-
-
-
-
-
-
-    /*bus_write(0xC004, 0xA2); [> ldx #$42 <]*/
-    /*bus_write(0xC005, 0x42); */
-    /*bus_write(0xC006, 0x86); [> stx $06 <]*/
-    /*bus_write(0xC007, 0x06);*/
-
-    /*bus_write(0xC008, 0xA0); [> ldy #$F3 <]*/
-    /*bus_write(0xC009, 0xF3); */
-    /*bus_write(0xC00A, 0x84); [> sty $09 <]*/
-    /*bus_write(0xC00B, 0x09);*/
-
-    /*bus_write(0xC00C, 0x4C); [> jmp $C069 <]*/
-    /*bus_write(0xC00D, 0x69);*/
-    /*bus_write(0xC00E, 0xC0);*/
-
-}
-
-
 /*
     print cpu state
     read a line of input
