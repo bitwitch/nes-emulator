@@ -4,6 +4,7 @@
 #include "bus.h"
 #include "cart.h"
 #include "io.h"
+#include "ppu.h"
 
 #ifdef DEBUG_LOG
 extern FILE *logfile;
@@ -29,6 +30,7 @@ int main(int argc, char **argv) {
 
         /* update */
         /*cpu_tick(&cpu);*/
+        /*ppu_tick(); ppu_tick(); ppu_tick();*/
 
         for (int i=0; i<WIDTH*HEIGHT; ++i) {
             uint8_t val = rand() % 256;

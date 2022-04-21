@@ -3,21 +3,12 @@
 #include <string.h>
 
 #include "cart.h"
+#include "ppu.h"
 
 #define MAX_MEMORY 65536
 
 static uint8_t cpu_ram[2048];
 
-
-
-/* FIXME: */
-uint8_t ppu_read(uint16_t addr) {
-    (void)addr;
-    return 0;
-}
-void ppu_write(uint16_t addr, uint8_t data) {
-    (void)addr; (void)data;
-}
 
 /*
     Memory map

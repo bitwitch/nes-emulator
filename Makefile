@@ -4,8 +4,8 @@ LFLAGS := -L/usr/local/lib -lSDL2_mixer
 
 .PHONY: nes
 
-nes: main.c bus.c cpu_6502.c cart.c io.c
-	$(CC) -o nes main.c bus.c cpu_6502.c cart.c io.c $(LFLAGS) $(CFLAGS) 
+nes: main.c bus.c cpu_6502.c cart.c io.c ppu.c
+	$(CC) -o nes main.c bus.c cpu_6502.c cart.c io.c ppu.c $(LFLAGS) $(CFLAGS) 
 
 debug: CFLAGS += -DDEBUG_LOG
 debug: nes
