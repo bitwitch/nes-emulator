@@ -10,7 +10,8 @@ typedef struct {
     uint8_t a, x, y, sp, status;
     uint16_t pc;
     uint8_t opcode;   /* stores current opcode fetched, used for the few instructions that have memory and accumulator modes */
-    int cycle_counter, interrupt_period;
+    uint8_t op_cycles;
+    uint64_t cycles;
     bool running;
 } cpu_t;
 
@@ -20,7 +21,7 @@ typedef struct {
     /* function pointer to operation */
     uint8_t (*execute)(cpu_t *cpu, uint16_t addr);
     /* function pointer to address mode */
-    uint16_t (*addr_mode)(cpu_t *cpu);
+    uint8_t (*addr_mode)(cpu_t *cpu, uint16_t *addr);
 } op_t;
 
 typedef enum {

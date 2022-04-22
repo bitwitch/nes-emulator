@@ -29,7 +29,7 @@ int main(int argc, char **argv) {
         /* get input */
 
         /* update */
-        /*cpu_tick(&cpu);*/
+        cpu_tick(&cpu);
         /*ppu_tick(); ppu_tick(); ppu_tick();*/
 
         for (int i=0; i<WIDTH*HEIGHT; ++i) {

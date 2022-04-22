@@ -61,38 +61,56 @@ void cpu_nmi(cpu_t *cpu) {
 }
 
 /****************************************************************************/
-/* address modes */
+/* Address Modes
+ *
+ * Each address mode takes an address as an out parameter, and returns 1 if
+ * there is potentially an additional cycle needed because of a page boundary
+ * crossing, or zero otherwise. This result will be combined with the
+ * additional cycle flag returned by the operation function to determine if an
+ * additional cycle is actually added or not
+*/
 /****************************************************************************/
-uint16_t am_imp(cpu_t *cpu) {
+uint8_t am_imp(cpu_t *cpu, uint16_t *addr) {
     (void)cpu; 
+    (void)addr;
     return 0; 
 }
 
-uint16_t am_abs(cpu_t *cpu) {
-    word_t addr;
-    addr.byte.l = bus_read(cpu->pc++);
-    addr.byte.h = bus_read(cpu->pc++);
-    return addr.w;
+uint8_t am_abs(cpu_t *cpu, uint16_t *addr) {
+    word_t result;
+    result.byte.l = bus_read(cpu->pc++);
+    result.byte.h = bus_read(cpu->pc++);
+    *addr = result.w;
+    return 0;
 }
 
-uint16_t am_abx(cpu_t *cpu) {
-    word_t addr;
-    addr.byte.l = bus_read(cpu->pc++);
-    addr.byte.h = bus_read(cpu->pc++);
-    addr.w += cpu->x;
-    return addr.w;
+uint8_t am_abx(cpu_t *cpu, uint16_t *addr) {
+    word_t base_addr;
+    base_addr.byte.l = bus_read(cpu->pc++);
+    base_addr.byte.h = bus_read(cpu->pc++);
+    *addr = base_addr.w + cpu->x;
+
+    if ((base_addr.w & 0xFF00) != (*addr & 0xFF00))
+        return 1;
+
+    return 0;
 }
 
-uint16_t am_aby(cpu_t *cpu) {
-    word_t addr;
-    addr.byte.l = bus_read(cpu->pc++);
-    addr.byte.h = bus_read(cpu->pc++);
-    addr.w += cpu->y;
-    return addr.w;
+uint8_t am_aby(cpu_t *cpu, uint16_t *addr) {
+    word_t base_addr;
+    base_addr.byte.l = bus_read(cpu->pc++);
+    base_addr.byte.h = bus_read(cpu->pc++);
+    *addr = base_addr.w + cpu->y;
+
+    if ((base_addr.w & 0xFF00) != (*addr & 0xFF00))
+        return 1;
+
+    return 0;
 }
 
-uint16_t am_imm(cpu_t *cpu) {
-    return cpu->pc++;
+uint8_t am_imm(cpu_t *cpu, uint16_t *addr) {
+    *addr = cpu->pc++;
+    return 0;
 }
 
 /*
@@ -100,57 +118,74 @@ uint16_t am_imm(cpu_t *cpu) {
  * like $xxFF would wrap around to $xx00 instead of the intended crossing of
  * the page boundary.  see http://archive.6502.org/publications/6502notes/6502_user_notes_15.pdf#page=24
  */
-uint16_t am_ind(cpu_t *cpu) {
-    word_t addr, pointer;
+uint8_t am_ind(cpu_t *cpu, uint16_t *addr) {
+    word_t result, pointer;
     pointer.byte.l = bus_read(cpu->pc++);
     pointer.byte.h = bus_read(cpu->pc++);
-    addr.byte.l = bus_read(pointer.w);
+    result.byte.l = bus_read(pointer.w);
     uint16_t ptr_high_byte = pointer.byte.l == 0xFF ? pointer.w & 0xFF00 : pointer.w + 1;
-    addr.byte.h = bus_read(ptr_high_byte);
-    return addr.w;
+    result.byte.h = bus_read(ptr_high_byte);
+    *addr = result.w;
+    return 0;
 }
 
-uint16_t am_x_ind(cpu_t *cpu) {
-    word_t addr;
+uint8_t am_x_ind(cpu_t *cpu, uint16_t *addr) {
+    word_t result;
     uint8_t zpg = cpu->x + bus_read(cpu->pc++);
-    addr.byte.l = bus_read(zpg++);
-    addr.byte.h = bus_read(zpg);
-    return addr.w;
+    result.byte.l = bus_read(zpg++);
+    result.byte.h = bus_read(zpg);
+    *addr = result.w;
+    return 0;
 }
 
-uint16_t am_ind_y(cpu_t *cpu) {
-    uint8_t zpg = bus_read(cpu->pc++);
+uint8_t am_ind_y(cpu_t *cpu, uint16_t *addr) {
     word_t pointer;
+    uint8_t zpg = bus_read(cpu->pc++);
     pointer.byte.l = bus_read(zpg);
     ++zpg;
     pointer.byte.h = bus_read(zpg);
-    return pointer.w + cpu->y;
+    *addr = pointer.w + cpu->y;
+
+    if ((pointer.w & 0xFF00) != (*addr & 0xFF00))
+        return 1;
+
+    return 0;
 }
 
-uint16_t am_rel(cpu_t *cpu) {
+uint8_t am_rel(cpu_t *cpu, uint16_t *addr) {
     /* NOTE: signed offset */
     int8_t offset = bus_read(cpu->pc++);
-    return cpu->pc + offset;
-    /* TODO(shaw) if a page transition occurs, then an extra cycle must
-     * be added to execution */
+    *addr = cpu->pc + offset;
+    if ((cpu->pc & 0xFF00) != (*addr & 0xFF00))
+        return 1;
+    return 0;
 }
 
-uint16_t am_zpg(cpu_t *cpu) {
-    return bus_read(cpu->pc++);
+uint8_t am_zpg(cpu_t *cpu, uint16_t *addr) {
+    *addr = bus_read(cpu->pc++);
+    return 0;
 }
 
-uint16_t am_zpx(cpu_t *cpu) {
-    uint8_t addr = cpu->x + bus_read(cpu->pc++);
-    return addr;
+uint8_t am_zpx(cpu_t *cpu, uint16_t *addr) {
+    *addr = cpu->x + bus_read(cpu->pc++);
+    *addr &= 0xFF; 
+    return 0;
 }
 
-uint16_t am_zpy(cpu_t *cpu) {
-    uint8_t addr = cpu->y + bus_read(cpu->pc++);
-    return addr;
+uint8_t am_zpy(cpu_t *cpu, uint16_t *addr) {
+    *addr = cpu->y + bus_read(cpu->pc++);
+    *addr &= 0xFF; 
+    return 0;
 }
 
 /****************************************************************************/
-/* operations */
+/* Operations 
+ *
+ * Return 1 if there is potentially an additional cycle needed or zero
+ * otherwise. This result will be combined with the additional cycle flag
+ * returned by the address mode to determine if an additional cycle is actually
+ * needed or not
+*/
 /****************************************************************************/
 uint8_t op_adc(cpu_t *cpu, uint16_t addr) {
     uint8_t operand = bus_read(addr);
@@ -163,14 +198,14 @@ uint8_t op_adc(cpu_t *cpu, uint16_t addr) {
     set_flag(cpu, STATUS_Z, cpu->a == 0);
     set_flag(cpu, STATUS_N, cpu->a >> 7);
     set_flag(cpu, STATUS_V, overflow);
-    return 0;
+    return 1;
 }
 
 uint8_t op_and(cpu_t *cpu, uint16_t addr) {
     cpu->a &= bus_read(addr);
     set_flag(cpu, STATUS_N, cpu->a >> 7);
     set_flag(cpu, STATUS_Z, cpu->a == 0);
-    return 0;
+    return 1;
 }
 
 uint8_t op_asl(cpu_t *cpu, uint16_t addr) {
@@ -194,29 +229,28 @@ uint8_t op_asl(cpu_t *cpu, uint16_t addr) {
 }
 
 uint8_t op_bcc(cpu_t *cpu, uint16_t addr) {
-    cpu->pc = get_flag(cpu, STATUS_C) ? cpu->pc : addr;
-    /* TODO(shaw): 
-     * add 1 to cycles if branch occurs on same page
-     * add 2 to cycles if branch occurs to different page
-     */
-    return 0;
+    if (get_flag(cpu, STATUS_C))
+        return 0;
+    ++cpu->cycles;
+    cpu->pc = addr;
+    return 1;
 }
 
 uint8_t op_bcs(cpu_t *cpu, uint16_t addr) {
-    cpu->pc = get_flag(cpu, STATUS_C) ? addr : cpu->pc;
-    /* TODO(shaw): 
-     * add 1 to cycles if branch occurs on same page
-     * add 2 to cycles if branch occurs to different page
-     */
+    if (get_flag(cpu, STATUS_C)) {
+        ++cpu->cycles;
+        cpu->pc = addr;
+        return 1;
+    }
     return 0;
 }
 
 uint8_t op_beq(cpu_t *cpu, uint16_t addr) {
-    cpu->pc = get_flag(cpu, STATUS_Z) ? addr : cpu->pc;
-    /* TODO(shaw): 
-     * add 1 to cycles if branch occurs on same page
-     * add 2 to cycles if branch occurs to different page
-     */
+    if (get_flag(cpu, STATUS_Z)) {
+        ++cpu->cycles;
+        cpu->pc = addr;
+        return 1;
+    }
     return 0;
 }
 
@@ -229,30 +263,28 @@ uint8_t op_bit(cpu_t *cpu, uint16_t addr) {
 }
 
 uint8_t op_bmi(cpu_t *cpu, uint16_t addr) {
-    cpu->pc = get_flag(cpu, STATUS_N) ? addr : cpu->pc;
-    /* TODO(shaw): 
-     * add 1 to cycles if branch occurs on same page
-     * add 2 to cycles if branch occurs to different page
-     */
+    if (get_flag(cpu, STATUS_N)) {
+        ++cpu->cycles;
+        cpu->pc = addr;
+        return 1;
+    }
     return 0;
 }
 
 uint8_t op_bne(cpu_t *cpu, uint16_t addr) {
-    cpu->pc = get_flag(cpu, STATUS_Z) ? cpu->pc : addr;
-    /* TODO(shaw): 
-     * add 1 to cycles if branch occurs on same page
-     * add 2 to cycles if branch occurs to different page
-     */
-    return 0;
+    if (get_flag(cpu, STATUS_Z))
+        return 0;
+    ++cpu->cycles;
+    cpu->pc = addr;
+    return 1;
 }
 
 uint8_t op_bpl(cpu_t *cpu, uint16_t addr) {
-    cpu->pc = get_flag(cpu, STATUS_N) ? cpu->pc : addr;
-    /* TODO(shaw): 
-     * add 1 to cycles if branch occurs on same page
-     * add 2 to cycles if branch occurs to different page
-     */
-    return 0;
+    if (get_flag(cpu, STATUS_N))
+        return 0;
+    ++cpu->cycles;
+    cpu->pc = addr;
+    return 1;
 }
 
 uint8_t op_brk(cpu_t *cpu, uint16_t addr) {
@@ -283,20 +315,19 @@ uint8_t op_brk(cpu_t *cpu, uint16_t addr) {
 }
 
 uint8_t op_bvc(cpu_t *cpu, uint16_t addr) {
-    cpu->pc = get_flag(cpu, STATUS_V) ? cpu->pc : addr;
-    /* TODO(shaw): 
-     * add 1 to cycles if branch occurs on same page
-     * add 2 to cycles if branch occurs to different page
-     */
-    return 0;
+    if (get_flag(cpu, STATUS_V)) 
+        return 0;
+    ++cpu->cycles;
+    cpu->pc = addr;
+    return 1;
 }
 
 uint8_t op_bvs(cpu_t *cpu, uint16_t addr) {
-    cpu->pc = get_flag(cpu, STATUS_V) ? addr : cpu->pc;
-    /* TODO(shaw): 
-     * add 1 to cycles if branch occurs on same page
-     * add 2 to cycles if branch occurs to different page
-     */
+    if (get_flag(cpu, STATUS_V)) {
+        ++cpu->cycles;
+        cpu->pc = addr;
+        return 1;
+    }
     return 0;
 }
 
@@ -330,7 +361,7 @@ uint8_t op_cmp(cpu_t *cpu, uint16_t addr) {
     set_flag(cpu, STATUS_C, cpu->a >= operand);
     set_flag(cpu, STATUS_N, result >> 7);
     set_flag(cpu, STATUS_Z, result == 0);
-    return 0;
+    return 1;
 }
 
 uint8_t op_cpx(cpu_t *cpu, uint16_t addr) {
@@ -379,7 +410,7 @@ uint8_t op_eor(cpu_t *cpu, uint16_t addr) {
     cpu->a ^= bus_read(addr);
     set_flag(cpu, STATUS_N, cpu->a >> 7);
     set_flag(cpu, STATUS_Z, cpu->a == 0);
-    return 0;
+    return 1;
 }
 
 uint8_t op_inc(cpu_t *cpu, uint16_t addr) {
@@ -431,21 +462,21 @@ uint8_t op_lda(cpu_t *cpu, uint16_t addr) {
     cpu->a = bus_read(addr);
     set_flag(cpu, STATUS_N, cpu->a >> 7);
     set_flag(cpu, STATUS_Z, cpu->a == 0);
-    return 0;
+    return 1;
 }
 
 uint8_t op_ldx(cpu_t *cpu, uint16_t addr) {
     cpu->x = bus_read(addr);
     set_flag(cpu, STATUS_N, cpu->x >> 7);
     set_flag(cpu, STATUS_Z, cpu->x == 0);
-    return 0;
+    return 1;
 }
 
 uint8_t op_ldy(cpu_t *cpu, uint16_t addr) {
     cpu->y = bus_read(addr);
     set_flag(cpu, STATUS_N, cpu->y >> 7);
     set_flag(cpu, STATUS_Z, cpu->y == 0);
-    return 0;
+    return 1;
 }
 
 uint8_t op_lsr(cpu_t *cpu, uint16_t addr) {
@@ -476,7 +507,7 @@ uint8_t op_ora(cpu_t *cpu, uint16_t addr) {
     cpu->a |= bus_read(addr);
     set_flag(cpu, STATUS_N, cpu->a >> 7);
     set_flag(cpu, STATUS_Z, cpu->a == 0);
-    return 0;
+    return 1;
 }
 
 uint8_t op_pha(cpu_t *cpu, uint16_t addr) {
@@ -584,7 +615,7 @@ uint8_t op_sbc(cpu_t *cpu, uint16_t addr) {
     set_flag(cpu, STATUS_Z, cpu->a == 0);
     set_flag(cpu, STATUS_N, cpu->a >> 7);
     set_flag(cpu, STATUS_V, overflow);
-    return 0;
+    return 1;
 }
 
 uint8_t op_sec(cpu_t *cpu, uint16_t addr) {
@@ -745,7 +776,7 @@ uint8_t op_lax(cpu_t *cpu, uint16_t addr) {
     cpu->x = cpu->a;
     set_flag(cpu, STATUS_N, cpu->a >> 7);
     set_flag(cpu, STATUS_Z, cpu->a == 0);
-    return 0;
+    return 1;
 }
 
 uint8_t op_dcp(cpu_t *cpu, uint16_t addr) {
@@ -858,7 +889,7 @@ uint8_t op_las(cpu_t *cpu, uint16_t addr) {
     cpu->sp = result;
     set_flag(cpu, STATUS_N, result >> 7);
     set_flag(cpu, STATUS_Z, result == 0);
-    return 0;
+    return 1;
 }
 
 op_t ops[OP_COUNT] = 
@@ -911,8 +942,8 @@ void cpu_reset(cpu_t *cpu) {
 
     /*cpu->pc = bus_read(0xFFFC) | (bus_read(0xFFFD) << 8);*/
 
-    cpu->interrupt_period = 1;
-    cpu->cycle_counter = cpu->interrupt_period;
+    cpu->cycles = 7;
+    cpu->op_cycles = 0;
 
     cpu->running = true;
 }
@@ -924,7 +955,8 @@ void debug_log_instruction(cpu_t *cpu) {
     char operands[6] = {0}; 
     char decoded[27] = {0};
     op_t op = ops[cpu->opcode];
-    uint16_t (*am)(cpu_t *cpu) = op.addr_mode;
+
+    uint8_t (*am)(cpu_t *cpu, uint16_t *addr) = op.addr_mode;
     uint8_t (*exe)(cpu_t *cpu, uint16_t addr) = op.execute;
 
     if (am == am_imp) {
@@ -1019,8 +1051,8 @@ void debug_log_instruction(cpu_t *cpu) {
         snprintf(decoded, 27, "$%.2X,Y @ %.2X = %.2X", operand, addr, bus_read(addr));
     }
 
-    fprintf(logfile, "%.4X  %.2X %-5s  %3s %-26s  A:%.2X X:%.2X Y:%.2X P:%.2X SP:%.2X\n",
-        cpu->pc-1, cpu->opcode, operands, op.name, decoded, cpu->a, cpu->x, cpu->y, cpu->status, cpu->sp);
+    fprintf(logfile, "%.4X  %.2X %-5s  %3s %-26s  A:%.2X X:%.2X Y:%.2X P:%.2X SP:%.2X CYC:%ld\n",
+        cpu->pc-1, cpu->opcode, operands, op.name, decoded, cpu->a, cpu->x, cpu->y, cpu->status, cpu->sp, cpu->cycles);
 }
 #endif
 
@@ -1047,15 +1079,23 @@ void print_cpu_state(cpu_t *cpu) {
 
 
 void cpu_tick(cpu_t *cpu) {
-    cpu->opcode = bus_read(cpu->pc++);
-    op_t op = ops[cpu->opcode];
+    if (cpu->op_cycles == 0) {
+        cpu->opcode = bus_read(cpu->pc++);
+        op_t op = ops[cpu->opcode];
+        cpu->op_cycles = op.cycles;
 
 #ifdef DEBUG_LOG
-    debug_log_instruction(cpu);
+        debug_log_instruction(cpu);
 #endif
 
-    uint16_t addr = op.addr_mode(cpu);
-    op.execute(cpu, addr);
+        uint16_t addr; 
+        uint8_t am_add_cycle = op.addr_mode(cpu, &addr);
+        uint8_t op_add_cycle = op.execute(cpu, addr);
+
+        cpu->op_cycles += (am_add_cycle & op_add_cycle);
+    }
+    --cpu->op_cycles;
+    ++cpu->cycles;
 }
 
 
