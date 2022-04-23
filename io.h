@@ -4,7 +4,7 @@
 #define WIDTH  256
 #define HEIGHT 240
 
-void draw(void);
+void draw(int fps);
 uint32_t *io_init(void);
 void io_deinit(void);
 

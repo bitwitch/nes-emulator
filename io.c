@@ -3,6 +3,7 @@
 
 #include "io.h"
 
+static SDL_Window *window;
 static SDL_Renderer *renderer;
 static SDL_Texture  *texture;
 static uint32_t     *pixels;
@@ -13,7 +14,7 @@ uint32_t *io_init(void) {
         exit(1);
     }
 
-    SDL_Window *window = SDL_CreateWindow(
+    window = SDL_CreateWindow(
         "NES",
         SDL_WINDOWPOS_UNDEFINED,
         SDL_WINDOWPOS_UNDEFINED,
@@ -52,7 +53,10 @@ uint32_t *io_init(void) {
     return pixels;
 }
 
-void draw(void) {
+void draw(int fps) {
+    char title[16];
+    snprintf(title, 16, "%s - %d FPS", "NES", fps);
+    SDL_SetWindowTitle(window, title);
     SDL_RenderClear(renderer);
     /*  upload pixel data to GPU */
     SDL_UpdateTexture(texture, NULL, pixels, WIDTH * sizeof(uint32_t));

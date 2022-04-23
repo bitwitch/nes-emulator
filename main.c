@@ -6,6 +6,8 @@
 #include "io.h"
 #include "ppu.h"
 
+#include <SDL2/SDL.h>
+
 #ifdef DEBUG_LOG
 extern FILE *logfile;
 #endif
@@ -20,25 +22,30 @@ int main(int argc, char **argv) {
     read_rom_file(argv[1]);
     cpu_reset(&cpu);
     uint32_t *pixels = io_init();
+    ppu_init(pixels);
 
 #ifdef DEBUG_LOG
     logfile = fopen("nestest.log", "w");
 #endif
 
+    uint64_t start_time, frame_time;
+    int fps = 0;
+
     for (;;) {
+        start_time = SDL_GetTicks64();
+
         /* get input */
 
         /* update */
         cpu_tick(&cpu);
-        /*ppu_tick(); ppu_tick(); ppu_tick();*/
-
-        for (int i=0; i<WIDTH*HEIGHT; ++i) {
-            uint8_t val = rand() % 256;
-            pixels[i] = (val << 16) | (val << 8) | val;
-        }
+        if (cpu.pc == 0x0001) break;
+        ppu_tick(); ppu_tick(); ppu_tick();
 
         /* draw */
-        draw();
+        draw(fps);
+
+        frame_time = SDL_GetTicks64() - start_time;
+        fps = (frame_time > 0) ? 1000.0f / frame_time : 0.0f;
 
         /* draw debug stuff */
             /* cpu state */
