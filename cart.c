@@ -116,11 +116,13 @@ void delete_cart() {
 uint8_t cart_read(uint16_t addr) {
     /* TODO(shaw): map out cart address space */
 
-    if (addr < 0x6000)
+    if (addr < 0x6000) 
         assert(0 && "this part of cart memory not implemented");
-    else if (addr < 0x8000)
+    else if (addr < 0x8000) /* $6000 - $7FFF */
         return cart.prg_ram[addr - 0x6000];
-    else 
+    else if (addr < 0xC000) /* $8000 - $BFFF */
+        return cart.prg_rom[addr - 0x8000];
+    else                    /* $C000 - $FFFF */
         return cart.prg_rom[addr - 0xC000];
 }
 

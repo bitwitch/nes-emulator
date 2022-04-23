@@ -500,7 +500,7 @@ uint8_t op_lsr(cpu_t *cpu, uint16_t addr) {
 
 uint8_t op_nop(cpu_t *cpu, uint16_t addr) {
     (void)cpu; (void)addr;
-    return 0;
+    return 1;
 }
 
 uint8_t op_ora(cpu_t *cpu, uint16_t addr) {
