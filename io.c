@@ -53,10 +53,56 @@ uint32_t *io_init(void) {
     return pixels;
 }
 
-void draw(int fps) {
-    char title[16];
-    snprintf(title, 16, "%s - %d FPS", "NES", fps);
-    SDL_SetWindowTitle(window, title);
+void do_input(void) {
+    SDL_Event event;
+
+    while (SDL_PollEvent(&event)) {
+        switch (event.type) {
+        case SDL_QUIT:
+            /*game.quit = true;*/
+            break;
+
+        case SDL_KEYDOWN:
+        case SDL_KEYUP:
+            if (event.key.repeat == 0) {
+                switch(event.key.keysym.scancode) {
+                case SDL_SCANCODE_UP:
+                    /*game.up = event.type == SDL_KEYDOWN;*/
+                    break;
+                case SDL_SCANCODE_DOWN:
+                    /*game.down = event.type == SDL_KEYDOWN;*/
+                    break;
+                case SDL_SCANCODE_LEFT:
+                    /*game.left = event.type == SDL_KEYDOWN;*/
+                    break;
+                case SDL_SCANCODE_RIGHT:
+                    /*game.right = event.type == SDL_KEYDOWN;*/
+                    break;
+                case SDL_SCANCODE_RETURN:
+                    /*game.enter = event.type == SDL_KEYDOWN;*/
+                    printf("ENTER\n");
+                    break;
+                default:
+                    break;
+                }
+
+            }
+            break;
+
+        default:
+            break;
+        }
+    }
+}
+
+
+
+
+uint64_t get_ticks(void) {
+    return SDL_GetTicks64();
+}
+
+void draw(void) {
     SDL_RenderClear(renderer);
     /*  upload pixel data to GPU */
     SDL_UpdateTexture(texture, NULL, pixels, WIDTH * sizeof(uint32_t));

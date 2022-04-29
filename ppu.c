@@ -14,6 +14,7 @@ typedef struct {
     uint8_t OAMDMA;
 
     bool even_odd_toggle; 
+    bool frame_completed;
     uint16_t scanline;
     uint16_t cycle;
 } ppu_t;
@@ -55,6 +56,17 @@ void ppu_tick(void) {
 
     if (++ppu.cycle > 340) {
         ppu.cycle = 0;
-        if (++ppu.scanline > 261) ppu.scanline = 0;
+        if (++ppu.scanline > 261) {
+            ppu.scanline = 0;
+            ppu.frame_completed = true;
+        }
     }
+}
+
+bool ppu_frame_completed(void) {
+    return ppu.frame_completed;
+}
+
+void ppu_clear_frame_completed(void) {
+    ppu.frame_completed = false;
 }

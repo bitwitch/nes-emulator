@@ -6,7 +6,7 @@
 #include "io.h"
 #include "ppu.h"
 
-#include <SDL2/SDL.h>
+#define MS_PER_FRAME (1000/60)
 
 #ifdef DEBUG_LOG
 extern FILE *logfile;
@@ -28,29 +28,39 @@ int main(int argc, char **argv) {
     logfile = fopen("nestest.log", "w");
 #endif
 
-    uint64_t start_time, frame_time;
-    int fps = 0;
+    bool frame_prepared = false;
+    uint64_t elapsed_time = 0;
+    uint64_t last_frame_time = get_ticks();
 
     for (;;) {
-        start_time = SDL_GetTicks64();
-
-        /* get input */
+        do_input();
 
         /* update */
-        cpu_tick(&cpu);
-        if (cpu.pc == 0x0001) break;
-        ppu_tick(); ppu_tick(); ppu_tick();
+        if (!frame_prepared) {
+            while (!ppu_frame_completed()) {
+                /*cpu_tick(&cpu);*/
+                /*if (cpu.pc == 0x0001) break; [> DELETE ME!!!! <]*/
+                ppu_tick(); ppu_tick(); ppu_tick();
+            }
+            ppu_clear_frame_completed();
+            frame_prepared = true;
+        }
 
-        /* draw */
-        draw(fps);
+        /* render */
+        elapsed_time = get_ticks() - last_frame_time;
+        if ((elapsed_time >= MS_PER_FRAME) && frame_prepared) {
+            draw();
+            /* draw debug stuff */
+                /* cpu state */
+                /* cart vrom */
+                /* some memory */
+            frame_prepared = false;
+            last_frame_time += MS_PER_FRAME;
 
-        frame_time = SDL_GetTicks64() - start_time;
-        fps = (frame_time > 0) ? 1000.0f / frame_time : 0.0f;
-
-        /* draw debug stuff */
-            /* cpu state */
-            /* cart vrom */
-            /* some memory */
+            /* NOTE(shaw): since get_ticks is a uint64_t and only has
+             * millisecond precision, the MS_PER_FRAME will be truncated to
+             * 16ms so fps will actually be 62.5 instead of 60 */
+        }
     }
 
     /* just let OS clean it up
@@ -65,3 +75,5 @@ int main(int argc, char **argv) {
 
     return 0;
 }
+
+
