@@ -24,25 +24,43 @@ int main(int argc, char **argv) {
     cpu_t cpu;
     read_rom_file(argv[1]);
     cpu_reset(&cpu);
+    io_init();
 
-    /*pixels = malloc(256*240*sizeof(uint32_t));*/
-    /*sprite_t nes_quad = make_sprite(pixels, 0, 0, 256*SCALE, 240*SCALE);*/
-    /*nes_quad.pixels = malloc(256*240*sizeof(uint32_t));*/
+    uint32_t *pixels; 
+    /* LEAK: 
+     * All of the malloc calls for sprite pixels are leaking. since the memory
+     * is used for the lifetime of the application, we are just ignoring and
+     * letting the operating system clean up at exit */
 
+    pixels = malloc(NES_WIDTH*NES_HEIGHT*sizeof(uint32_t));
+    if (!pixels) { perror("malloc"); exit(1); }
+    sprite_t nes_quad = make_sprite(pixels, NES_WIDTH, NES_HEIGHT, 
+        0, 0, NES_WIDTH*SCALE, NES_HEIGHT*SCALE);
+    register_sprite(&nes_quad);
 
-    uint32_t *pixels = io_init();
-    ppu_init(pixels);
+    /* pattern tables */
+    for (int i=0; i<2; ++i) {
+        pixels = malloc(128*128*sizeof(uint32_t));
+        if (!pixels) { perror("malloc"); exit(1); }
+        pattern_tables[i] = make_sprite(pixels, 128, 128, i*(128+3), 0, 128, 128);
+        register_sprite(&pattern_tables[i]);
+    }
 
-    /* LEAK: ignoring and letting operating system clean up at exit */
-    for (int i=0; i<2; ++i)
-        pattern_tables[i].pixels = malloc(128*128*sizeof(uint32_t));
+    /* palettes */
     for (int i=0; i<8; ++i) {
-        palettes[i].pixels = malloc(4*1*sizeof(uint32_t));
+        pixels = malloc(4*1*sizeof(uint32_t));
+        if (!pixels) { perror("malloc"); exit(1); }
+        palettes[i] = make_sprite(pixels, 4, 1, i*(4+1)*10, 200, 4*10, 1*10);
+        register_sprite(&palettes[i]);
+    }
+    /* TEMPORARY */
+    for (int i=0; i<8; ++i) {
         palettes[i].pixels[0] = 0xFFFF0000;
         palettes[i].pixels[1] = 0xFF00FF00;
         palettes[i].pixels[2] = 0xFF0000FF;
     }
 
+    ppu_init(nes_quad.pixels);
 
 #ifdef DEBUG_LOG
     logfile = fopen("nestest.log", "w");
@@ -87,7 +105,6 @@ int main(int argc, char **argv) {
     }
 
     /* just let OS clean it up
-     * io_deinit();
      * delete_cart(&cart);
      */
 

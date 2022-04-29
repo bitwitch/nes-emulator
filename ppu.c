@@ -192,7 +192,7 @@ void ppu_tick(void) {
     if (ppu.scanline < 240) { /* visible scanlines */
         if (ppu.cycle < 256) {
             uint8_t val = rand() % 256;
-            screen_pixels[ppu.scanline * WIDTH + ppu.cycle] = (val << 16) | (val << 8) | val;
+            screen_pixels[ppu.scanline * NES_WIDTH + ppu.cycle] = (val << 16) | (val << 8) | val;
         }
     } else if (ppu.scanline == 241 && ppu.cycle == 1) {
         ppu.registers[PPUSTATUS] |= 0x80;      /* set vblank */

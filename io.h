@@ -4,23 +4,26 @@
 #include <SDL2/SDL.h>
 #include <stdint.h>
 
-#define WIDTH  256
-#define HEIGHT 240
+#define NES_WIDTH  256
+#define NES_HEIGHT 240
 #define SCALE 3
-#define WINDOW_WIDTH  (WIDTH*SCALE/0.68)
-#define WINDOW_HEIGHT (HEIGHT*SCALE)
+#define WINDOW_WIDTH  (NES_WIDTH*SCALE/0.68)
+#define WINDOW_HEIGHT (NES_HEIGHT*SCALE)
 
 typedef struct {
     SDL_Texture *texture;
     uint32_t *pixels;
+    int w, h;
     SDL_Rect dstrect;
 } sprite_t;
 
-uint32_t *io_init(void);
-void io_deinit(void);
+void io_init(void);
 void draw(void);
 uint64_t get_ticks(void);
 void do_input(void);
-sprite_t make_sprite(uint32_t *pixels, int dest_x, int dest_y, int dest_w, int dest_h);
+sprite_t make_sprite(uint32_t *pixels, int w, int h,
+                     int dest_x, int dest_y, int dest_w, int dest_h);
+void register_sprite(sprite_t *sprite);
+
 
 #endif
