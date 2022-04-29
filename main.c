@@ -12,6 +12,9 @@
 extern FILE *logfile;
 #endif
 
+sprite_t palettes[8];
+sprite_t pattern_tables[2];
+
 int main(int argc, char **argv) {
     if (argc < 2) {
         printf("Usage: %s ROM_FILE\n", argv[0]);
@@ -21,8 +24,25 @@ int main(int argc, char **argv) {
     cpu_t cpu;
     read_rom_file(argv[1]);
     cpu_reset(&cpu);
+
+    /*pixels = malloc(256*240*sizeof(uint32_t));*/
+    /*sprite_t nes_quad = make_sprite(pixels, 0, 0, 256*SCALE, 240*SCALE);*/
+    /*nes_quad.pixels = malloc(256*240*sizeof(uint32_t));*/
+
+
     uint32_t *pixels = io_init();
     ppu_init(pixels);
+
+    /* LEAK: ignoring and letting operating system clean up at exit */
+    for (int i=0; i<2; ++i)
+        pattern_tables[i].pixels = malloc(128*128*sizeof(uint32_t));
+    for (int i=0; i<8; ++i) {
+        palettes[i].pixels = malloc(4*1*sizeof(uint32_t));
+        palettes[i].pixels[0] = 0xFFFF0000;
+        palettes[i].pixels[1] = 0xFF00FF00;
+        palettes[i].pixels[2] = 0xFF0000FF;
+    }
+
 
 #ifdef DEBUG_LOG
     logfile = fopen("nestest.log", "w");
@@ -44,6 +64,9 @@ int main(int argc, char **argv) {
             }
             ppu_clear_frame_completed();
             frame_prepared = true;
+
+            update_pattern_tables(pattern_tables);
+            update_palettes(palettes);
         }
 
         /* render */
