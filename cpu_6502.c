@@ -231,14 +231,14 @@ uint8_t op_asl(cpu_t *cpu, uint16_t addr) {
 uint8_t op_bcc(cpu_t *cpu, uint16_t addr) {
     if (get_flag(cpu, STATUS_C))
         return 0;
-    ++cpu->cycles;
+    ++cpu->op_cycles;
     cpu->pc = addr;
     return 1;
 }
 
 uint8_t op_bcs(cpu_t *cpu, uint16_t addr) {
     if (get_flag(cpu, STATUS_C)) {
-        ++cpu->cycles;
+        ++cpu->op_cycles;
         cpu->pc = addr;
         return 1;
     }
@@ -247,7 +247,7 @@ uint8_t op_bcs(cpu_t *cpu, uint16_t addr) {
 
 uint8_t op_beq(cpu_t *cpu, uint16_t addr) {
     if (get_flag(cpu, STATUS_Z)) {
-        ++cpu->cycles;
+        ++cpu->op_cycles;
         cpu->pc = addr;
         return 1;
     }
@@ -264,7 +264,7 @@ uint8_t op_bit(cpu_t *cpu, uint16_t addr) {
 
 uint8_t op_bmi(cpu_t *cpu, uint16_t addr) {
     if (get_flag(cpu, STATUS_N)) {
-        ++cpu->cycles;
+        ++cpu->op_cycles;
         cpu->pc = addr;
         return 1;
     }
@@ -274,7 +274,7 @@ uint8_t op_bmi(cpu_t *cpu, uint16_t addr) {
 uint8_t op_bne(cpu_t *cpu, uint16_t addr) {
     if (get_flag(cpu, STATUS_Z))
         return 0;
-    ++cpu->cycles;
+    ++cpu->op_cycles;
     cpu->pc = addr;
     return 1;
 }
@@ -282,7 +282,7 @@ uint8_t op_bne(cpu_t *cpu, uint16_t addr) {
 uint8_t op_bpl(cpu_t *cpu, uint16_t addr) {
     if (get_flag(cpu, STATUS_N))
         return 0;
-    ++cpu->cycles;
+    ++cpu->op_cycles;
     cpu->pc = addr;
     return 1;
 }
@@ -317,14 +317,14 @@ uint8_t op_brk(cpu_t *cpu, uint16_t addr) {
 uint8_t op_bvc(cpu_t *cpu, uint16_t addr) {
     if (get_flag(cpu, STATUS_V)) 
         return 0;
-    ++cpu->cycles;
+    ++cpu->op_cycles;
     cpu->pc = addr;
     return 1;
 }
 
 uint8_t op_bvs(cpu_t *cpu, uint16_t addr) {
     if (get_flag(cpu, STATUS_V)) {
-        ++cpu->cycles;
+        ++cpu->op_cycles;
         cpu->pc = addr;
         return 1;
     }
@@ -938,17 +938,19 @@ void cpu_reset(cpu_t *cpu) {
     /* TODO(shaw): the reset vector is 0xFFFC, 0xFFFD on startup the cpu would
      * read the values at these locations into pc and perform a JMP. For now
      * i'm just hardcoding the pc to a value */
-    cpu->pc = 0xC000;
+    /*cpu->pc = 0xC000;*/
 
-    /*cpu->pc = bus_read(0xFFFC) | (bus_read(0xFFFD) << 8);*/
+    cpu->pc = bus_read(0xFFFC) | (bus_read(0xFFFD) << 8);
 
-    cpu->cycles = 7;
-    cpu->op_cycles = 0;
+    cpu->cycles = 0;
+    cpu->op_cycles = 7; /* reset takes 7 cycles */
 
     cpu->running = true;
 }
 
 #ifdef DEBUG_LOG
+uint16_t ppu_get_cycle(void);
+uint16_t ppu_get_scanline(void);
 void debug_log_instruction(cpu_t *cpu) {
     assert(logfile && "logfile is not defined or could not be opened");
 
@@ -1051,8 +1053,7 @@ void debug_log_instruction(cpu_t *cpu) {
         snprintf(decoded, 27, "$%.2X,Y @ %.2X = %.2X", operand, addr, bus_read(addr));
     }
 
-    fprintf(logfile, "%.4X  %.2X %-5s  %3s %-26s  A:%.2X X:%.2X Y:%.2X P:%.2X SP:%.2X CYC:%ld\n",
-        cpu->pc-1, cpu->opcode, operands, op.name, decoded, cpu->a, cpu->x, cpu->y, cpu->status, cpu->sp, cpu->cycles);
+    fprintf(logfile, "%.4X  %.2X %-5s  %3s %-26s  A:%.2X X:%.2X Y:%.2X P:%.2X SP:%.2X PPU:%3d,%3d CYC:%ld\n", cpu->pc-1, cpu->opcode, operands, op.name, decoded, cpu->a, cpu->x, cpu->y, cpu->status, cpu->sp, ppu_get_scanline(), ppu_get_cycle(), cpu->cycles);
 }
 #endif
 

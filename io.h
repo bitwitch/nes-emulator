@@ -7,7 +7,8 @@
 #define NES_WIDTH  256
 #define NES_HEIGHT 240
 #define SCALE 3
-#define WINDOW_WIDTH  (NES_WIDTH*SCALE/0.68)
+#define NES_DEBUG_RATIO (0.68) /* how much of screen is nes vs how much is debug info */
+#define WINDOW_WIDTH  (NES_WIDTH*SCALE/NES_DEBUG_RATIO)
 #define WINDOW_HEIGHT (NES_HEIGHT*SCALE)
 
 typedef struct {

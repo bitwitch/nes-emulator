@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "bus.h"
 #include "cart.h"
 #include "ppu.h"
 
@@ -50,5 +51,10 @@ void bus_write(uint16_t addr, uint8_t data) {
     } 
     else 
         cart_write(addr, data);
+}
+
+void system_reset(cpu_t *cpu) {
+    /*ppu_reset();*/
+    cpu_reset(cpu);
 }
 

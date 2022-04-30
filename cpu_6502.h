@@ -49,6 +49,7 @@ void cpu_reset(cpu_t *cpu);
 /* exposed so the repl can easily inspect cpu internal state */
 uint8_t get_flag(cpu_t *cpu, status_mask_t flag);
 void set_flag(cpu_t *cpu, status_mask_t flag, bool value);
+void debug_log_instruction(cpu_t *cpu);
 
 
 /*****************************************************************/

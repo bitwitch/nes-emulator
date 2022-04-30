@@ -104,10 +104,9 @@ void update_palettes(sprite_t palettes[8]) {
 }
 
 /* used just for debug drawing pattern_tables */
-void update_pattern_tables(sprite_t pattern_tables[8]) {
+void update_pattern_tables(sprite_t pattern_tables[2]) {
     (void)pattern_tables;
 }
-
 
 /* reads from cpu, addr is 0-7 */
 uint8_t ppu_read(uint16_t addr) {
@@ -232,3 +231,13 @@ void ppu_clear_frame_completed(void) {
 bool ppu_nmi(void) {
     return ppu.nmi;
 }
+
+uint16_t ppu_get_cycle(void) {
+    return ppu.cycle;
+}
+
+uint16_t ppu_get_scanline(void) {
+    return ppu.scanline;
+}
+
+
