@@ -1,5 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
+#define STB_DS_IMPLEMENTATION
+#include "stb_ds.h"
 #include "cpu_6502.h"
 #include "bus.h"
 #include "cart.h"
@@ -8,11 +10,20 @@
 
 #define MS_PER_FRAME (1000/60)
 
+#define MAX_CPU_STATE_LINES 36
+#define MAX_DEBUG_LINE_CHARS 34
+#define MAX_CODE_LINES 12
+
 #ifdef DEBUG_LOG
 extern FILE *logfile;
 #endif
 
-void init_debug_sidebar(sprite_t pattern_tables[2], sprite_t palettes[8], sprite_t *asm_quad);
+static char *cpu_state_lines[MAX_CPU_STATE_LINES];
+
+void init_debug_sidebar(sprite_t pattern_tables[2], sprite_t palettes[8], sprite_t *code_quad);
+void render_cpu_state(cpu_t *cpu, char **cpu_state_lines);
+void render_code(uint16_t addr, dasm_map_t *dasm);
+
 
 int main(int argc, char **argv) {
     if (argc < 2) {
@@ -24,10 +35,19 @@ int main(int argc, char **argv) {
     read_rom_file(argv[1]);
     io_init();
 
+    /* LEAK: disassemble allocates memory for strings */
+    dasm_map_t *dasm = disassemble(0xC000, 0xFFFF);
+
     /* LEAK: 
      * All of the malloc calls for sprite pixels are leaking. since the memory
      * is used for the lifetime of the application, we are just ignoring and
      * letting the operating system clean up at exit */
+
+    for (int i=0; i<MAX_CPU_STATE_LINES-1; ++i) {
+        cpu_state_lines[i] = calloc(MAX_DEBUG_LINE_CHARS+1, 1);
+        if (!cpu_state_lines[i]) { perror("malloc"); exit(1); }
+    }
+    cpu_state_lines[MAX_CPU_STATE_LINES-1] = NULL;
 
     uint32_t *pixels = malloc(NES_WIDTH*NES_HEIGHT*sizeof(uint32_t));
     if (!pixels) { perror("malloc"); exit(1); }
@@ -38,34 +58,12 @@ int main(int argc, char **argv) {
     /* initialize debug sidebar */
     sprite_t pattern_tables[2];
     sprite_t palettes[8];
-    sprite_t asm_quad;
-    init_debug_sidebar(pattern_tables, palettes, &asm_quad);
-
-    /*char *asm_lines[11] = { "Well", "hello", "friends", ":^)" , NULL};*/
-    
-    /*render_text(asm_quad.pixels, asm_width, asm_height, asm_lines);*/
-
-    /* TEMPORARY */
-    /* TEMPORARY */
-    for (int i=0; i<128*128; ++i) {
-        pattern_tables[0].pixels[i] = 0xCAB192;
-        pattern_tables[1].pixels[i] = 0x123040;
-    }
-    for (int i=0; i<8; ++i) {
-        palettes[i].pixels[0] = 0xFF0000;
-        palettes[i].pixels[1] = 0x00FF00;
-        palettes[i].pixels[2] = 0x0000FF;
-    }
-    for (int i=0; i<asm_quad.w*asm_quad.h; ++i) {
-        asm_quad.pixels[i] = 0xFFEEEE;
-    }
-    /* TEMPORARY */
-    /* TEMPORARY */
+    sprite_t code_quad;
+    init_debug_sidebar(pattern_tables, palettes, &code_quad);
 
     ppu_init(nes_quad.pixels);
 
     cpu_reset(&cpu);
-
 
 #ifdef DEBUG_LOG
     logfile = fopen("nestest.log", "w");
@@ -82,6 +80,7 @@ int main(int argc, char **argv) {
         if (!frame_prepared) {
             while (!ppu_frame_completed()) {
                 cpu_tick(&cpu);
+                /*if (cpu.cycles > 190000) exit(0);*/
                 /*if (cpu.pc == 0x0001) break; [> DELETE ME!!!! <]*/
                 ppu_tick(); ppu_tick(); ppu_tick();
             }
@@ -95,11 +94,12 @@ int main(int argc, char **argv) {
         /* render */
         elapsed_time = get_ticks() - last_frame_time;
         if ((elapsed_time >= MS_PER_FRAME) && frame_prepared) {
+            prepare_drawing();
+            render_sprites();
+            render_cpu_state(&cpu, cpu_state_lines);
+            render_code(cpu.pc, dasm);
             draw();
-            /* draw debug stuff */
-                /* cpu state */
-                /* cart vrom */
-                /* some memory */
+
             frame_prepared = false;
             last_frame_time += MS_PER_FRAME;
 
@@ -123,8 +123,10 @@ int main(int argc, char **argv) {
 
 void init_debug_sidebar(sprite_t pattern_tables[2], 
                         sprite_t palettes[8],
-                        sprite_t *asm_quad)
+                        sprite_t *code_quad)
 {
+    (void)code_quad; /* TODO: remove this parameter */
+
     uint32_t *pixels; 
     double debug_width = NES_WIDTH*SCALE*(1-NES_DEBUG_RATIO)/(NES_DEBUG_RATIO);
     double pad = 0.0133333*debug_width;
@@ -158,15 +160,74 @@ void init_debug_sidebar(sprite_t pattern_tables[2],
         register_sprite(&palettes[i]);
     }
 
-    int asm_width = (NES_WIDTH*(1-NES_DEBUG_RATIO)/NES_DEBUG_RATIO) - (2*pad/SCALE);
-    int asm_height = (y_pos - 3*pad)/SCALE;
-    pixels = malloc(asm_width*asm_height*sizeof(uint32_t));
-    *asm_quad = make_sprite(pixels, asm_width, asm_height, 
-        NES_WIDTH*SCALE + pad, 
-        pad, 
-        asm_width*SCALE, 
-        asm_height*SCALE); 
-    register_sprite(asm_quad);
+    /* disassembled code */
+    /*int asm_width = 2*((NES_WIDTH*(1-NES_DEBUG_RATIO)/NES_DEBUG_RATIO) - (2*pad/SCALE));*/
+    /*int asm_height = 2*(y_pos - 3*pad)/SCALE;*/
+    /*pixels = malloc(asm_width*asm_height*sizeof(uint32_t));*/
+    /*if (!pixels) { perror("malloc"); exit(1); }*/
+    /**code_quad = make_sprite(pixels, asm_width, asm_height, */
+        /*NES_WIDTH*SCALE + pad, */
+        /*pad, */
+        /*0.5*asm_width*SCALE, */
+        /*0.5*asm_height*SCALE); */
+    /*register_sprite(code_quad);*/
+
+
+    /* TEMPORARY */
+    /* TEMPORARY */
+    for (int i=0; i<128*128; ++i) {
+        pattern_tables[0].pixels[i] = 0xCAB192;
+        pattern_tables[1].pixels[i] = 0x123040;
+    }
+    for (int i=0; i<8; ++i) {
+        palettes[i].pixels[0] = 0xFF0000;
+        palettes[i].pixels[1] = 0x00FF00;
+        palettes[i].pixels[2] = 0x0000FF;
+    }
+    /*for (int i=0; i<code_quad.w*code_quad.h; ++i) {*/
+        /*code_quad.pixels[i] = 0xFFEEEE;*/
+    /*}*/
+    /* TEMPORARY */
+    /* TEMPORARY */
+
+
+
+
 }
 
+void render_cpu_state(cpu_t *cpu, char **lines) {
+    snprintf(lines[0], MAX_DEBUG_LINE_CHARS+1, "N V _ B D I Z C");
+    snprintf(lines[1], MAX_DEBUG_LINE_CHARS+1, "%d %d %d %d %d %d %d %d",  
+        (cpu->status >> 7) & 1, (cpu->status >> 6) & 1, (cpu->status >> 5) & 1, 
+        (cpu->status >> 4) & 1, (cpu->status >> 3) & 1, (cpu->status >> 2) & 1, 
+        (cpu->status >> 1) & 1, (cpu->status >> 0) & 1); 
+    snprintf(lines[2], MAX_DEBUG_LINE_CHARS+1, "PC: %.4X", cpu->pc);
+    snprintf(lines[3], MAX_DEBUG_LINE_CHARS+1, " A: %.2X", cpu->a);
+    snprintf(lines[4], MAX_DEBUG_LINE_CHARS+1, " X: %.2X", cpu->x);
+    snprintf(lines[5], MAX_DEBUG_LINE_CHARS+1, " Y: %.2X", cpu->y);
+    snprintf(lines[6], MAX_DEBUG_LINE_CHARS+1, "SP: %.2X", cpu->sp);
+
+    #define PAD (0.0133333*NES_WIDTH*SCALE*(1-NES_DEBUG_RATIO)/(NES_DEBUG_RATIO))
+    for (int i=0; i<MAX_CPU_STATE_LINES; ++i) {
+        char *line = lines[i];
+        if (line == NULL) break;
+        render_text(line, NES_WIDTH*SCALE+PAD, i*FONT_CHAR_HEIGHT*SCALE+PAD);
+    }
+    #undef PAD
+}   
+
+void render_code(uint16_t addr, dasm_map_t *dasm) {
+    int ins_index = hmgeti(dasm, addr);
+    int max_index = ins_index + MAX_CODE_LINES/2;
+    if (max_index >= hmlen(dasm)) max_index = hmlen(dasm)-1;
+    int min_index = max_index - MAX_CODE_LINES; 
+    if (min_index < 0) min_index = 0;
+
+    #define PAD (0.0133333*NES_WIDTH*SCALE*(1-NES_DEBUG_RATIO)/(NES_DEBUG_RATIO))
+    for (int i=min_index; i<=max_index; ++i)
+        render_text(dasm[i].value, 
+            NES_WIDTH*SCALE+PAD, 
+            (i-min_index)*FONT_CHAR_HEIGHT*SCALE + 7*FONT_CHAR_HEIGHT*SCALE + PAD);
+    #undef PAD
+}
 

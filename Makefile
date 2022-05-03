@@ -1,7 +1,7 @@
 CC=gcc
 #CFLAGS=-Wall -Wextra -pedantic -D_GNU_SOURCE -O2 $(shell sdl2-config --cflags --libs)
 CFLAGS=-Wall -Wextra -pedantic -Og -g $(shell sdl2-config --cflags --libs)
-LFLAGS := -L/usr/local/lib -lSDL2_mixer
+LFLAGS := -L/usr/local/lib -lSDL2_mixer -lm
 
 .PHONY: nes
 

@@ -39,12 +39,19 @@ typedef enum {
     STATUS_N = 1 << 7
 } status_mask_t;
 
+typedef struct {
+    uint16_t key;    /* address */
+    char *value;     /* instruction string */
+} dasm_map_t;
+
 void cpu_irq(cpu_t *cpu);
 void cpu_nmi(cpu_t *cpu);
 
 void cpu_tick(cpu_t *cpu);  /* executes a single instruction */
 int cpu_run(cpu_t *cpu);
 void cpu_reset(cpu_t *cpu);
+
+dasm_map_t *disassemble(uint16_t start, uint16_t stop);
 
 /* exposed so the repl can easily inspect cpu internal state */
 uint8_t get_flag(cpu_t *cpu, status_mask_t flag);
