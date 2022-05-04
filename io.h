@@ -2,6 +2,7 @@
 #define __IO_H__
 
 #include <SDL2/SDL.h>
+#include <stdbool.h>
 #include <stdint.h>
 
 #define NES_WIDTH  256
@@ -21,16 +22,25 @@ typedef struct {
     SDL_Rect dstrect;
 } sprite_t;
 
+typedef struct {
+    bool enter;
+    bool space;
+    bool f;
+    bool escape;
+} platform_state_t;
+
 void io_init(void);
 void io_deinit(void);
 void prepare_drawing(void);
 void render_sprites(void);
 void draw(void);
 uint64_t get_ticks(void);
-void do_input(void);
+void do_input(platform_state_t *platform_state);
 sprite_t make_sprite(uint32_t *pixels, int w, int h,
                      int dest_x, int dest_y, int dest_w, int dest_h);
 void register_sprite(sprite_t *sprite);
+void set_font_color(uint32_t color);
 void render_text(char *text, int x, int y);
+void render_text_color(char *text, int x, int y, uint32_t color_mod);
 
 #endif

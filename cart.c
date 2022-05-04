@@ -114,9 +114,10 @@ void delete_cart() {
 }
 
 uint8_t cart_read(uint16_t addr) {
-    /* TODO(shaw): map out cart address space */
-
-    if (addr < 0x6000) 
+    /* TODO(shaw): implement this correctly based on each mapper */
+    if (addr < 0x2000) 
+        return cart.chr_rom[addr];
+    else if (addr < 0x6000) 
         assert(0 && "this part of cart memory not implemented");
     else if (addr < 0x8000) /* $6000 - $7FFF */
         return cart.prg_ram[addr - 0x6000];
@@ -127,7 +128,8 @@ uint8_t cart_read(uint16_t addr) {
 }
 
 void cart_write(uint16_t addr, uint8_t data) {
-    /* TODO(shaw): map out cart address space */
+    /* TODO(shaw): implement this correctly based on each mapper */
+
     if (addr < 0x6000)
         assert(0 && "this part of cart memory not implemented");
     if (addr < 0x8000)

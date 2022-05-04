@@ -957,10 +957,10 @@ dasm_map_t *disassemble(uint16_t start, uint16_t stop) {
     uint8_t opcode;
     uint16_t addr = start;
     uint8_t (*am)(cpu_t *cpu, uint16_t *addr);
-    /*uint8_t (*exe)(cpu_t *cpu, uint16_t addr);*/
 
     while (addr >= start && addr <= stop) {
         char *ins = malloc(24*sizeof(char));
+        if (!ins) { perror("malloc"); exit(1); }
         char am_string[13] = {0};
         opcode = bus_read(addr);
         op_t op = ops[opcode];

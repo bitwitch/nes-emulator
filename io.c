@@ -69,19 +69,29 @@ void io_init(void) {
     signal(SIGINT, SIG_DFL);
 }
 
-void do_input(void) {
+void do_input(platform_state_t *platform_state) {
     SDL_Event event;
 
     while (SDL_PollEvent(&event)) {
         switch (event.type) {
         case SDL_QUIT:
             /*game.quit = true;*/
+            exit(0);
             break;
 
         case SDL_KEYDOWN:
         case SDL_KEYUP:
             if (event.key.repeat == 0) {
                 switch(event.key.keysym.scancode) {
+                case SDL_SCANCODE_RETURN:
+                    platform_state->enter = event.type == SDL_KEYDOWN;
+                    break;
+                case SDL_SCANCODE_SPACE:
+                    platform_state->space = event.type == SDL_KEYDOWN;
+                    break;
+                case SDL_SCANCODE_F:
+                    platform_state->f = event.type == SDL_KEYDOWN;
+                    break;
                 case SDL_SCANCODE_UP:
                     /*game.up = event.type == SDL_KEYDOWN;*/
                     break;
@@ -93,10 +103,6 @@ void do_input(void) {
                     break;
                 case SDL_SCANCODE_RIGHT:
                     /*game.right = event.type == SDL_KEYDOWN;*/
-                    break;
-                case SDL_SCANCODE_RETURN:
-                    /*game.enter = event.type == SDL_KEYDOWN;*/
-                    printf("ENTER\n");
                     break;
                 default:
                     break;
@@ -152,8 +158,8 @@ sprite_t make_sprite(uint32_t *pixels, int w, int h, int dest_x, int dest_y, int
     s.surface = SDL_CreateRGBSurfaceFrom(
         pixels,
         w, h,
-        8*3,
-        3*w,
+        8*3,      /* depth */
+        w,        /* pitch */
         0x0000FF, 
         0x00FF00, 
         0xFF0000, 
@@ -192,57 +198,33 @@ void render_text(char *text, int x, int y) {
             FONT_CHAR_HEIGHT*SCALE };
         SDL_RenderCopy(renderer, font.texture, &font.glyphs[*c-32], &dstrect);
     }
+
 }
 
-/*void render_text(SDL_Surface *dest, char **lines) {*/
-    /*[>int pitch = font.w * font.bytes_per_pixel;<]*/
-    /*int line_num, i_char;*/
-    /*char **lptr;*/
+void set_font_color(uint32_t color) {
+    SDL_SetTextureColorMod(font.texture,
+        (color >> 16) & 0xFF,
+        (color >>  8) & 0xFF,
+        (color >>  0) & 0xFF);
+}
 
-    /*SDL_Rect dstrect = {*/
-        /*.x = 0, */
-        /*.y = 0, */
-        /*.w = FONT_CHAR_WIDTH, */
-        /*.h = FONT_CHAR_HEIGHT };*/
-
-    /*for (line_num=0, lptr=lines; */
-         /**lptr != NULL; */
-         /*++lptr, ++line_num) */
-    /*{*/
-        /*for (i_char=0; */
-             /*(*lptr)[i_char] != '\0'; */
-             /*++i_char) */
-        /*{*/
-            /*[>char c = (*lptr)[i_char];<]*/
-            /*[>[>assert(c > 31 && c < 127);<]<]*/
-            /*[>int col = (c-32) % (font.w/FONT_CHAR_WIDTH);<]*/
-            /*[>int row = (c-32) / (font.w/FONT_CHAR_WIDTH);<]*/
-            /*[>int src_start = row*FONT_CHAR_HEIGHT * pitch + col*FONT_CHAR_WIDTH*font.bytes_per_pixel;<]*/
-            /*[>int dst_start = (line_num*FONT_CHAR_HEIGHT) * w + (i_char * FONT_CHAR_WIDTH);<]*/
-
-            /*[>for (int j=0; j<FONT_CHAR_HEIGHT; ++j) <]*/
-            /*[>for (int i=0; i<FONT_CHAR_WIDTH; ++i) {<]*/
-                /*[>pixels[dst_start + (j*w+i)] = <]*/
-                    /*[>(font.data[src_start + (j * pitch + (i*font.bytes_per_pixel))]   << 16) |<]*/
-                    /*[>(font.data[src_start + (j * pitch + (i*font.bytes_per_pixel+1))] <<  8) |<]*/
-                    /*[>(font.data[src_start + (j * pitch + (i*font.bytes_per_pixel+2))]);<]*/
-            /*[>}<]*/
-
-            /*char c = (*lptr)[i_char];*/
-            /*dstrect.x = i_char * FONT_CHAR_WIDTH;*/
-            /*dstrect.y = line_num * FONT_CHAR_HEIGHT;*/
-            /*SDL_BlitSurface(*/
-                /*font.surface,*/
-                /*&font.glyphs[c-32],*/
-                /*dest,*/
-                /*&dstrect);*/
-        /*}*/
-    /*}*/
-    
-
-
-    /*[> TODO make sure doesnt overflow w and h <]*/
-/*}*/
+void render_text_color(char *text, int x, int y, uint32_t color) {
+    int i; char *c;
+    for (i=0, c=text; *c != '\0'; ++c, ++i) {
+        assert(*c > 31 && *c < 127);
+        SDL_Rect dstrect = { 
+            x + i*FONT_CHAR_WIDTH*SCALE, 
+            y, 
+            FONT_CHAR_WIDTH*SCALE, 
+            FONT_CHAR_HEIGHT*SCALE };
+        SDL_SetTextureColorMod(font.texture, 
+            (color >> 16) & 0xFF,
+            (color >>  8) & 0xFF,
+            (color >>  0) & 0xFF);
+        SDL_RenderCopy(renderer, font.texture, &font.glyphs[*c-32], &dstrect);
+        SDL_SetTextureColorMod(font.texture, 0xFF, 0xFF, 0xFF);
+    }
+}
 
 void io_deinit(void) {
 }

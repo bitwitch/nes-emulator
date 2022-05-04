@@ -1,6 +1,7 @@
 #include <stdbool.h>
 #include "ppu.h"
 #include "io.h"
+#include "cart.h"
 
 #include <stdlib.h> /* TEMP just for rand */
 
@@ -62,11 +63,13 @@ static uint8_t
 ppu_bus_read(uint16_t addr) {
     uint8_t data = 0;
     if (addr < 0x2000) {
-        /*cart_read()*/
+        data = cart_read(addr);
     } else if (addr < 0x3F00) {
         /*vram read*/
     } else {
-        data = ppu.palette_ram[(addr - 0x3F00) & 0xFF];
+        addr = (addr - 0x3F00) & 0x1F;
+        if (addr % 4 == 0) addr = 0;
+        data = ppu.palette_ram[addr];
     }
 
     return data;
@@ -79,8 +82,17 @@ ppu_bus_write(uint16_t addr, uint8_t data) {
     } else if (addr < 0x3F00) {
         /*vram write */
     } else {
-        ppu.palette_ram[(addr - 0x3F00) & 0xFF] = data;
+        addr = (addr - 0x3F00) & 0x1F;
+        if (addr % 4 == 0) addr = 0;
+        ppu.palette_ram[addr] = data;
     }
+}
+
+static uint32_t
+get_color_from_palette(uint8_t palette_num, uint8_t palette_index) {
+    uint16_t addr = 0x3F01 + palette_num*4 + palette_index;
+    uint8_t index = ppu_bus_read(addr);
+    return ppu.colors[index];
 }
 
 void ppu_init(uint32_t *pixels) {
@@ -92,20 +104,68 @@ void ppu_init(uint32_t *pixels) {
 
 /* used just for debug drawing palettes */
 void update_palettes(sprite_t palettes[8]) {
-    uint32_t bg_color = ppu.colors[ppu.palette_ram[0]];
+    uint32_t bg_color = ppu.colors[ppu_bus_read(0x3F00)];
     for (int i=0; i<8; ++i) {
         uint32_t *pixels = palettes[i].pixels;
         for (int p=0; p<3; ++p) {
-            int index = ppu.palette_ram[i*4+1];
-            pixels[p] = ppu.colors[index];
+            pixels[p] = get_color_from_palette(i, p);
         }
         pixels[3] = bg_color;
     }
 }
 
+/*
+row 1
+0x0000 - 0x000F
+0x0010 - 0x001F
+0x0020 - 0x002F
+0x0030 - 0x003F
+0x0040 - 0x004F
+0x0050 - 0x005F
+0x0060 - 0x006F
+0x0070 - 0x007F
+0x0080 - 0x008F
+0x0090 - 0x009F
+0x00a0 - 0x00aF
+0x00b0 - 0x00bF
+0x00c0 - 0x00cF
+0x00d0 - 0x00dF
+0x00e0 - 0x00eF
+0x00f0 - 0x00fF
+
+row 2
+0x0100 - 0x010F
+0x0110 - 0x011F
+0x0120 - 0x012F
+
+w = 0x100
+row * w + col
+*/
+
 /* used just for debug drawing pattern_tables */
-void update_pattern_tables(sprite_t pattern_tables[2]) {
-    (void)pattern_tables;
+void update_pattern_tables(int selected_palette, sprite_t pattern_tables[2]) {
+    int pitch = pattern_tables[0].surface->pitch;
+    /*for each pattern table*/
+    for (int table=0; table<2; ++table)
+    /*for each tile in the pattern table*/
+    for (uint16_t tile_row=0; tile_row<16; ++tile_row)
+    for (uint16_t tile_col=0; tile_col<16; ++tile_col) {
+        uint16_t tile_start = table*0x1000 + tile_row*0x100 + tile_col*0x10;
+        uint16_t pixel_start = (tile_row*pitch+tile_col)*8;
+        /*for each row in the tile*/
+        for (int tile_y=0; tile_y<8; ++tile_y) {
+            uint8_t plane0 = ppu_bus_read(tile_start+tile_y);
+            uint8_t plane1 = ppu_bus_read(tile_start+tile_y+8);
+            /*for each col in the tile*/
+            for (int tile_x=0; tile_x<8; ++tile_x) {
+                int i = pixel_start + tile_y*pitch + (7-tile_x);
+                uint8_t pal_index = (plane0 & 1) | ((plane1 & 1) << 1);
+                uint32_t color = get_color_from_palette(selected_palette, pal_index);
+                pattern_tables[table].pixels[i] = color;
+                plane0 >>= 1; plane1 >>= 1;
+            }
+        }
+    }
 }
 
 /* reads from cpu, addr is 0-7 */
