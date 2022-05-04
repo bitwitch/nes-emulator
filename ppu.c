@@ -18,8 +18,6 @@
  *  $3F20-3FFF     Mirrors of $3F00-$3F1F
  */
 
-static uint32_t *screen_pixels;
-
 typedef struct {
     uint8_t vram[2048];
     uint8_t palette_ram[32];
@@ -29,6 +27,7 @@ typedef struct {
     uint8_t data_buffer;
 
     uint32_t colors[64];
+    uint32_t *screen_pixels;
     bool even_odd_toggle;
     bool offset_toggle; /* used for writing low or high byte into address */
     bool frame_completed;
@@ -49,6 +48,8 @@ enum {
 };
 
 static ppu_t ppu = { 
+    /* palette generate from bisquit.iki.fi/utils/nespalette/php 
+     * this format is ARGB */
     .colors = { 0xff525252, 0xff511a01, 0xff650f0f, 0xff630623, 0xff4b0336, 0xff260440, 0xff04093f, 0xff001332, 0xff00201f, 0xff002a0b, 0xff002f00, 0xff0a2e00, 0xff2d2600, 0xff000000, 0xff000000, 0xff000000, 0xffa0a0a0, 0xff9d4a1e, 0xffbc3738, 0xffb82858, 0xff942175, 0xff5c2384, 0xff242e82, 0xff003f6f, 0xff005251, 0xff006331, 0xff056b1a, 0xff2e690e, 0xff685c10, 0xff000000, 0xff000000, 0xff000000, 0xfffffffe, 0xfffc9e69, 0xffff8789, 0xffff76ae, 0xfff16dce, 0xffb270e0, 0xff707cde, 0xff3e91c8, 0xff25a7a6, 0xff28ba81, 0xff46c463, 0xff7dc154, 0xffc0b356, 0xff3c3c3c, 0xff000000, 0xff000000, 0xfffffffe, 0xfffdd6be, 0xffffcccc, 0xffffc4dd, 0xfff9c0ea, 0xffdfc1f2, 0xffc2c7f1, 0xffaad0e8, 0xff9ddad9, 0xff9ee2c9, 0xffaee6bc, 0xffc7e5b4, 0xffe4dfb5, 0xffa9a9a9, 0xff000000, 0xff000000 } };
 
 #define CTRL_NMI              ((ppu.registers[PPUCTRL] >> 7) & 1)
@@ -96,9 +97,10 @@ get_color_from_palette(uint8_t palette_num, uint8_t palette_index) {
 }
 
 void ppu_init(uint32_t *pixels) {
-    screen_pixels = pixels;
-    /* palette generate from bisquit.iki.fi/utils/nespalette/php 
-     * this format is ARGB */
+    ppu.screen_pixels = pixels;
+    /* grab some random uninitialzed pixels to visualize palette on load */
+    for (int i=0; i<32; ++i)
+        ppu.palette_ram[i] = (uint8_t)pixels[i];
 }
 
 
@@ -251,7 +253,7 @@ void ppu_tick(void) {
     if (ppu.scanline < 240) { /* visible scanlines */
         if (ppu.cycle < 256) {
             uint8_t val = rand() % 256;
-            screen_pixels[ppu.scanline * NES_WIDTH + ppu.cycle] = (val << 16) | (val << 8) | val;
+            ppu.screen_pixels[ppu.scanline * NES_WIDTH + ppu.cycle] = (val << 16) | (val << 8) | val;
         }
     } else if (ppu.scanline == 241 && ppu.cycle == 1) {
         ppu.registers[PPUSTATUS] |= 0x80;      /* set vblank */

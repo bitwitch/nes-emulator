@@ -240,7 +240,6 @@ void init_debug_sidebar(sprite_t pattern_tables[2],
             pal_height);                                      /* dest height */
         register_sprite(&palettes[i]);
     }
-    update_palettes(palettes);
 
     /* disassembled code */
     (void)code_quad; 
