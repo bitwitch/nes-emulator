@@ -60,6 +60,8 @@ void cpu_nmi(cpu_t *cpu) {
 
     /* set interrupt disable */
     set_flag(cpu, STATUS_I, 1);
+
+    cpu->op_cycles = 7;
 }
 
 /****************************************************************************/

@@ -31,6 +31,9 @@ void init_debug_sidebar(sprite_t pattern_tables[2], sprite_t palettes[8], sprite
 void render_cpu_state(cpu_t *cpu, char **cpu_state_lines);
 void render_code(uint16_t addr, dasm_map_t *dasm);
 
+emulation_mode_t fake_call (void) {
+    return EM_STEP_INSTRUCTION;
+}
 
 int main(int argc, char **argv) {
     if (argc < 2) {
@@ -45,7 +48,7 @@ int main(int argc, char **argv) {
     platform_state_t last_platform_state = {0};
 
     /* LEAK: disassemble allocates memory for strings */
-    dasm_map_t *dasm = disassemble(0xC000, 0xFFFF);
+    dasm_map_t *dasm = disassemble(0x8000, 0xFFFF);
 
     /* LEAK: 
      * All of the malloc calls for sprite pixels are leaking. since the memory
@@ -70,7 +73,11 @@ int main(int argc, char **argv) {
     sprite_t code_quad;
     init_debug_sidebar(pattern_tables, palettes, &code_quad);
 
+
     ppu_init(nes_quad.pixels);
+
+    update_pattern_tables(0, pattern_tables);
+    update_palettes(palettes);
 
     cpu_reset(&cpu);
 
@@ -93,16 +100,22 @@ int main(int argc, char **argv) {
             /* update */
             if (!frame_prepared) {
                 while (!ppu_frame_completed()) {
+                    /*if (cpu.op_cycles == 0 && ppu_nmi()) {*/
+                        /*cpu_nmi(&cpu);*/
+                        /*emulation_mode = EM_STEP_INSTRUCTION;*/
+                    /*}*/
                     cpu_tick(&cpu);
-                    /*if (cpu.cycles > 190000) exit(0);*/
-                    /*if (cpu.pc == 0x0001) break; [> DELETE ME!!!! <]*/
+                    /*if (cpu.pc == 0xC5F4) {*/
+                        /*emulation_mode = fake_call();*/
+                    /*}*/
                     ppu_tick(); ppu_tick(); ppu_tick();
                 }
+                
                 ppu_clear_frame_completed();
                 frame_prepared = true;
 
-                /*update_pattern_tables(0, pattern_tables);*/
-                /*update_palettes(palettes);*/
+                update_pattern_tables(0, pattern_tables);
+                update_palettes(palettes);
             }
 
             /* render */
@@ -135,6 +148,8 @@ int main(int argc, char **argv) {
         {
             /* update */
             if (platform_state.space && !last_platform_state.space) {
+                /*if (cpu.op_cycles == 0 && ppu_nmi())*/
+                    /*cpu_nmi(&cpu);*/
                 do {
                     cpu_tick(&cpu);
                     /*if (cpu.cycles > 190000) exit(0);*/
@@ -174,6 +189,41 @@ int main(int argc, char **argv) {
 
         case EM_STEP_FRAME:
         {
+            /* update */
+            if (!frame_prepared && platform_state.f && !last_platform_state.f) {
+                while (!ppu_frame_completed()) {
+                    /*if (cpu.op_cycles == 0 && ppu_nmi())*/
+                        /*cpu_nmi(&cpu);*/
+                    cpu_tick(&cpu);
+                    /*if (cpu.cycles > 190000) exit(0);*/
+                    /*if (cpu.pc == 0x0001) break; [> DELETE ME!!!! <]*/
+                    ppu_tick(); ppu_tick(); ppu_tick();
+                }
+                
+                ppu_clear_frame_completed();
+                frame_prepared = true;
+
+                update_pattern_tables(0, pattern_tables);
+                update_palettes(palettes);
+            }
+
+            /* render */
+            elapsed_time = get_ticks() - last_frame_time;
+            if ((elapsed_time >= MS_PER_FRAME) && frame_prepared) {
+                prepare_drawing();
+                render_sprites();
+                render_cpu_state(&cpu, cpu_state_lines);
+                render_code(cpu.pc, dasm);
+                draw();
+
+                frame_prepared = false;
+                last_frame_time += MS_PER_FRAME;
+
+                /* NOTE(shaw): since get_ticks is a uint64_t and only has
+                 * millisecond precision, the MS_PER_FRAME will be truncated to
+                 * 16ms so fps will actually be 62.5 instead of 60 */
+            }
+
 
             /* state transfer */
             if (platform_state.enter && !last_platform_state.enter)
@@ -210,10 +260,11 @@ void init_debug_sidebar(sprite_t pattern_tables[2],
 
     double debug_width = NES_WIDTH*SCALE*(1-NES_DEBUG_RATIO)/(NES_DEBUG_RATIO);
     double pad = 0.0133333*debug_width;
+    double y_pos;
 
     /* pattern tables */
     double pat_width = 0.48*debug_width;
-    double y_pos = (NES_HEIGHT*SCALE) - pat_width - pad;
+    y_pos = (NES_HEIGHT*SCALE) - pat_width - pad;
     for (int i=0; i<2; ++i) {
         uint32_t *pixels = malloc(128*128*sizeof(uint32_t));
         if (!pixels) { perror("malloc"); exit(1); }
@@ -224,7 +275,6 @@ void init_debug_sidebar(sprite_t pattern_tables[2],
             pat_width);                                       /* dest height */
         register_sprite(&pattern_tables[i]);
     }
-    update_pattern_tables(0, pattern_tables);
 
     /* palettes */
     double pal_width = 0.11*debug_width;

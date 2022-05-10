@@ -18,6 +18,25 @@
  *  $3F20-3FFF     Mirrors of $3F00-$3F1F
  */
 
+
+/*
+ *  Loopy Registers:
+ *  yyy NN YYYYY XXXXX
+ *  ||| || ||||| +++++-- coarse X scroll
+ *  ||| || +++++-------- coarse Y scroll
+ *  ||| ++-------------- nametable select
+ *  +++----------------- fine Y scroll
+*/
+typedef union {
+    uint16_t reg;
+    struct {
+        uint16_t coarse_x  : 5;
+        uint16_t coarse_y  : 5;
+        uint16_t nt_select : 2;
+        uint16_t fine_y    : 3;
+    } bits;
+} loopy_t;
+
 typedef struct {
     uint8_t vram[2048];
     uint8_t palette_ram[32];
@@ -29,11 +48,17 @@ typedef struct {
     uint32_t colors[64];
     uint32_t *screen_pixels;
     bool even_odd_toggle;
-    bool offset_toggle; /* used for writing low or high byte into address */
     bool frame_completed;
-    bool nmi;
+    bool nmi_occured;
     uint16_t cycle, scanline;
+
+    /* temp */
     uint16_t address;
+    /* temp */
+
+    loopy_t vram_addr, vram_temp;
+    uint8_t fine_x;
+    bool offset_toggle; /* used for writing low or high byte into address */
 } ppu_t;
 
 enum {
@@ -60,13 +85,25 @@ static ppu_t ppu = {
 #define CTRL_INC_VERTICAL     ((ppu.registers[PPUCTRL] >> 2) & 1)
 #define CTRL_BASE_NAMETABLE   (ppu.registers[PPUCTRL] & 0x3)
 
+#define MASK_EMP_B            ((ppu.registers[PPUMASK] >> 7) & 1)
+#define MASK_EMP_G            ((ppu.registers[PPUMASK] >> 6) & 1)
+#define MASK_EMP_R            ((ppu.registers[PPUMASK] >> 5) & 1)
+#define MASK_SHOW_SPR         ((ppu.registers[PPUMASK] >> 4) & 1)
+#define MASK_SHOW_BG          ((ppu.registers[PPUMASK] >> 3) & 1)
+#define MASK_SHOW_SPR_LEFT    ((ppu.registers[PPUMASK] >> 2) & 1)
+#define MASK_SHOW_BG_LEFT     ((ppu.registers[PPUMASK] >> 1) & 1)
+#define MASK_GREY             ((ppu.registers[PPUMASK] >> 0) & 1)
+
+
 static uint8_t 
 ppu_bus_read(uint16_t addr) {
     uint8_t data = 0;
     if (addr < 0x2000) {
         data = cart_read(addr);
     } else if (addr < 0x3F00) {
-        /*vram read*/
+        /* TODO(shaw): do this with mappers */
+        addr = (addr - 0x2000) & 0x07FF;
+        return ppu.vram[addr];
     } else {
         addr = (addr - 0x3F00) & 0x1F;
         if (addr % 4 == 0) addr = 0;
@@ -81,7 +118,9 @@ ppu_bus_write(uint16_t addr, uint8_t data) {
     if (addr < 0x2000) {
         /*cart_write()*/
     } else if (addr < 0x3F00) {
-        /*vram write */
+        /* TODO(shaw): do this with mappers */
+        addr = (addr - 0x2000) & 0x07FF;
+        ppu.vram[addr] = data;
     } else {
         addr = (addr - 0x3F00) & 0x1F;
         if (addr % 4 == 0) addr = 0;
@@ -98,9 +137,12 @@ get_color_from_palette(uint8_t palette_num, uint8_t palette_index) {
 
 void ppu_init(uint32_t *pixels) {
     ppu.screen_pixels = pixels;
-    /* grab some random uninitialzed pixels to visualize palette on load */
-    for (int i=0; i<32; ++i)
-        ppu.palette_ram[i] = (uint8_t)pixels[i];
+    /* initialize with some random colors to visualize palette on load */
+    for (int i=0; i<32; ++i) {
+        int r = rand();
+        ppu.palette_ram[i] = (uint8_t)(r >> 6);
+        /*ppu.palette_ram[i] = (uint8_t)pixels[i];*/
+    }
 }
 
 
@@ -182,6 +224,7 @@ uint8_t ppu_read(uint16_t addr) {
         {
             data = (ppu.registers[PPUSTATUS] & 0xE0) | (ppu.data_buffer & 0x1F);
             ppu.registers[PPUSTATUS] &= ~0x80; /* clear vblank */
+            ppu.nmi_occured = false;
             ppu.offset_toggle = 0;
             break;
         }
@@ -212,8 +255,11 @@ uint8_t ppu_read(uint16_t addr) {
 void ppu_write(uint16_t addr, uint8_t data) {
     switch (addr) {
         case PPUCTRL: 
+        {
             ppu.registers[PPUCTRL] = data;
+            ppu.vram_temp.bits.nt_select = data & 3;
             break;
+        }
         case PPUMASK: 
             ppu.registers[PPUMASK] = data;
             break;
@@ -225,18 +271,31 @@ void ppu_write(uint16_t addr, uint8_t data) {
             break;
         case PPUSCROLL:
         {
-            /*if (ppu.offset_toggle)*/
-                /*[>y scroll<]*/
-            /*else */
-                /*[>x scroll<]*/
+            if (ppu.offset_toggle) {
+                ppu.vram_temp.bits.coarse_y = (data >> 3) & 0x1F;
+                ppu.vram_temp.bits.fine_y = data & 7;
+            } else {
+                ppu.vram_temp.bits.coarse_x = (data >> 3) & 0x1F;
+                ppu.fine_x = data & 7;
+            }
+            ppu.offset_toggle = !ppu.offset_toggle;
             break;
         }
         case PPUADDR:
         {
+
             if (ppu.offset_toggle)
                 ppu.address = (ppu.address & 0xFF00) | data;
             else
                 ppu.address = (ppu.address & 0x00FF) | (data << 8);
+
+            /*if (ppu.offset_toggle) {*/
+                /*ppu.vram_temp.reg = (ppu.vram_temp.reg & ~0xFF) | data;*/
+                /*ppu.vram_addr.reg = ppu.vram_temp.reg;*/
+            /*} else {*/
+                /*ppu.vram_temp.reg = (ppu.vram_temp.reg & ~0x7F00) | (data & 0x3F);*/
+            /*}*/
+
             ppu.offset_toggle = !ppu.offset_toggle;
             break;
         } 
@@ -248,21 +307,51 @@ void ppu_write(uint16_t addr, uint8_t data) {
     }
 }
 
-void ppu_tick(void) {
-    
-    if (ppu.scanline < 240) { /* visible scanlines */
-        if (ppu.cycle < 256) {
-            uint8_t val = rand() % 256;
-            ppu.screen_pixels[ppu.scanline * NES_WIDTH + ppu.cycle] = (val << 16) | (val << 8) | val;
+void rendering_tick(void) {
+    if (ppu.cycle > 0 && (ppu.cycle < 256 || ppu.cycle > 320)) {
+        switch ((ppu.cycle - 1) % 8) {
+        case 0:
+            /* nametable fetch */
+            break;
+        case 2:
+            /* attribute fetch */
+            break;
+        case 4:
+            /* low bg tile byte */
+            break;
+        case 6:
+            /* high bg tile byte */
+            break;
+        case 7:
+            /* high bg tile byte */
+            break;
         }
+    } else if (ppu.cycle == 256) {
+
+    } else if (ppu.cycle == 257) {
+
+    }
+}
+
+void render_pixel(void) {
+    uint8_t val = rand() % 256;
+    ppu.screen_pixels[ppu.scanline * NES_WIDTH + ppu.cycle] = (val << 16) | (val << 8) | val;
+}
+
+void ppu_tick(void) {
+
+    if (ppu.scanline < 240) { 
+        if (MASK_SHOW_SPR || MASK_SHOW_BG) rendering_tick();
+        if (ppu.cycle < 256) render_pixel();
     } else if (ppu.scanline == 241 && ppu.cycle == 1) {
         ppu.registers[PPUSTATUS] |= 0x80;      /* set vblank */
-        if (CTRL_NMI)
-            ppu.nmi = true;
+        ppu.nmi_occured = true;
     } else if (ppu.scanline == 261) {
-        if (ppu.cycle == 1)
+        if (ppu.cycle == 1) {
             ppu.registers[PPUSTATUS] &= ~0x80; /* clear vblank */
-        else if (ppu.cycle == 239 && ppu.even_odd_toggle) { /* TODO: && bg_rendering_enabled */
+            ppu.nmi_occured = false;
+
+        } else if (ppu.cycle == 239 && ppu.even_odd_toggle) { /* TODO: && bg_rendering_enabled */
             /* skip cycle 0 idle on odd ticks when bg enabled */
             ppu.cycle = 0;
             ppu.scanline = 0;
@@ -291,7 +380,7 @@ void ppu_clear_frame_completed(void) {
 }
 
 bool ppu_nmi(void) {
-    return ppu.nmi;
+    return ppu.nmi_occured && CTRL_NMI;
 }
 
 uint16_t ppu_get_cycle(void) {
