@@ -31,10 +31,6 @@ void init_debug_sidebar(sprite_t pattern_tables[2], sprite_t palettes[8], sprite
 void render_cpu_state(cpu_t *cpu, char **cpu_state_lines);
 void render_code(uint16_t addr, dasm_map_t *dasm);
 
-emulation_mode_t fake_call (void) {
-    return EM_STEP_INSTRUCTION;
-}
-
 int main(int argc, char **argv) {
     if (argc < 2) {
         printf("Usage: %s ROM_FILE\n", argv[0]);
@@ -94,20 +90,25 @@ int main(int argc, char **argv) {
         last_platform_state = platform_state;
         do_input(&platform_state);
 
+        /* transfer states */
+        if (platform_state.enter && !last_platform_state.enter)
+            emulation_mode = EM_RUN;
+        else if (platform_state.space && !last_platform_state.space)
+            emulation_mode = EM_STEP_INSTRUCTION;
+        else if (platform_state.f && !last_platform_state.f)
+            emulation_mode = EM_STEP_FRAME;
+
         switch (emulation_mode) {
         case EM_RUN:
         {
             /* update */
             if (!frame_prepared) {
                 while (!ppu_frame_completed()) {
-                    /*if (cpu.op_cycles == 0 && ppu_nmi()) {*/
-                        /*cpu_nmi(&cpu);*/
-                        /*emulation_mode = EM_STEP_INSTRUCTION;*/
-                    /*}*/
+                    if (cpu.op_cycles == 0 && ppu_nmi())  {
+                        cpu_nmi(&cpu);
+                        ppu_clear_nmi();
+                    }
                     cpu_tick(&cpu);
-                    /*if (cpu.pc == 0xC5F4) {*/
-                        /*emulation_mode = fake_call();*/
-                    /*}*/
                     ppu_tick(); ppu_tick(); ppu_tick();
                 }
                 
@@ -135,12 +136,6 @@ int main(int argc, char **argv) {
                  * 16ms so fps will actually be 62.5 instead of 60 */
             }
 
-            /* state transfer */
-            if (platform_state.space && !last_platform_state.space)
-                emulation_mode = EM_STEP_INSTRUCTION;
-            else if (platform_state.f && !last_platform_state.f)
-                emulation_mode = EM_STEP_FRAME;
-
             break;
         }
 
@@ -148,12 +143,12 @@ int main(int argc, char **argv) {
         {
             /* update */
             if (platform_state.space && !last_platform_state.space) {
-                /*if (cpu.op_cycles == 0 && ppu_nmi())*/
-                    /*cpu_nmi(&cpu);*/
+                if (cpu.op_cycles == 0 && ppu_nmi()) {
+                    cpu_nmi(&cpu);
+                    ppu_clear_nmi();
+                }
                 do {
                     cpu_tick(&cpu);
-                    /*if (cpu.cycles > 190000) exit(0);*/
-                    /*if (cpu.pc == 0x0001) break; [> DELETE ME!!!! <]*/
                     ppu_tick(); ppu_tick(); ppu_tick();
                 } while (cpu.op_cycles > 0);
 
@@ -178,12 +173,6 @@ int main(int argc, char **argv) {
                  * 16ms so fps will actually be 62.5 instead of 60 */
             }
 
-            /* state transfer */
-            if (platform_state.enter && !last_platform_state.enter)
-                emulation_mode = EM_RUN;
-            else if (platform_state.f && !last_platform_state.f)
-                emulation_mode = EM_STEP_FRAME;
- 
             break;
         }
 
@@ -192,11 +181,11 @@ int main(int argc, char **argv) {
             /* update */
             if (!frame_prepared && platform_state.f && !last_platform_state.f) {
                 while (!ppu_frame_completed()) {
-                    /*if (cpu.op_cycles == 0 && ppu_nmi())*/
-                        /*cpu_nmi(&cpu);*/
+                    if (cpu.op_cycles == 0 && ppu_nmi()) {
+                        cpu_nmi(&cpu);
+                        ppu_clear_nmi();
+                    }
                     cpu_tick(&cpu);
-                    /*if (cpu.cycles > 190000) exit(0);*/
-                    /*if (cpu.pc == 0x0001) break; [> DELETE ME!!!! <]*/
                     ppu_tick(); ppu_tick(); ppu_tick();
                 }
                 
@@ -223,13 +212,6 @@ int main(int argc, char **argv) {
                  * millisecond precision, the MS_PER_FRAME will be truncated to
                  * 16ms so fps will actually be 62.5 instead of 60 */
             }
-
-
-            /* state transfer */
-            if (platform_state.enter && !last_platform_state.enter)
-                emulation_mode = EM_RUN;
-            else if (platform_state.space && !last_platform_state.space)
-                emulation_mode = EM_STEP_INSTRUCTION;
 
             break;
         }

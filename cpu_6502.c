@@ -37,7 +37,7 @@ void cpu_irq(cpu_t *cpu) {
     --cpu->sp;
 
     /* jump to interrupt handler */
-    cpu->pc = bus_read(0xFFFA) | (bus_read(0xFFFB) << 8);
+    cpu->pc = bus_read(0xFFFE) | (bus_read(0xFFFF) << 8);
 
     /* set interrupt disable */
     set_flag(cpu, STATUS_I, 1);
@@ -56,7 +56,7 @@ void cpu_nmi(cpu_t *cpu) {
     --cpu->sp;
 
     /* jump to interrupt handler */
-    cpu->pc = bus_read(0xFFFE) | (bus_read(0xFFFF) << 8);
+    cpu->pc = bus_read(0xFFFA) | (bus_read(0xFFFB) << 8);
 
     /* set interrupt disable */
     set_flag(cpu, STATUS_I, 1);

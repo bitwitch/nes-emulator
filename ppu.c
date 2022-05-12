@@ -1,9 +1,9 @@
 #include <stdbool.h>
+#include <stdlib.h> /* for rand */
 #include "ppu.h"
 #include "io.h"
 #include "cart.h"
 
-#include <stdlib.h> /* TEMP just for rand */
 
 /*
  * PPU Memory Map
@@ -101,7 +101,6 @@ static ppu_t ppu = {
 #define MASK_SHOW_SPR_LEFT    ((ppu.registers[PPUMASK] >> 2) & 1)
 #define MASK_SHOW_BG_LEFT     ((ppu.registers[PPUMASK] >> 1) & 1)
 #define MASK_GREY             ((ppu.registers[PPUMASK] >> 0) & 1)
-
 
 static uint8_t 
 ppu_bus_read(uint16_t addr) {
@@ -328,18 +327,18 @@ void rendering_tick(void) {
     if (ppu.cycle > 0 && (ppu.cycle < 256 || ppu.cycle > 320)) {
         ppu.bg_shifter_pat_lo <<= 1; ppu.bg_shifter_pat_hi <<= 1;
         ppu.bg_shifter_attr_lo <<= 1; ppu.bg_shifter_attr_hi <<= 1;
-        loopy_t v = ppu.vram_addr;
+        loopy_t *v = &ppu.vram_addr;
         switch ((ppu.cycle - 1) % 8) {
         case 0:
             /* nametable fetch */
-            ppu.nt_byte = ppu_bus_read(0x2000 | (v.reg & 0x0FFF));
+            ppu.nt_byte = ppu_bus_read(0x2000 | (v->reg & 0x0FFF));
             break;
 
         case 2:
         {
             /* attribute fetch */
-            uint8_t at_byte = ppu_bus_read(0x23C0 | (v.reg & 0x0C00) | 
-                ((v.reg >> 4) & 0x38) | ((v.reg >> 2) & 0x7));
+            uint8_t at_byte = ppu_bus_read(0x23C0 | (v->reg & 0x0C00) | 
+                ((v->reg >> 4) & 0x38) | ((v->reg >> 2) & 0x7));
             ppu.bg_shifter_attr_lo = (ppu.bg_shifter_attr_lo & 0xFF00) | ((at_byte & 1) ? 0xFF : 0);
             ppu.bg_shifter_attr_hi = (ppu.bg_shifter_attr_hi & 0xFF00) | ((at_byte & 2) ? 0xFF : 0);
             break;
@@ -351,7 +350,7 @@ void rendering_tick(void) {
             uint8_t bg_tile_lo = ppu_bus_read(
                 (((uint16_t)CTRL_BG_TABLE) << 12) |
                 (((int16_t)ppu.nt_byte) << 4) | 
-                v.bits.fine_y);
+                v->bits.fine_y);
             ppu.bg_shifter_pat_lo = (ppu.bg_shifter_pat_lo & 0xFF00) | bg_tile_lo;
             break;
         }
@@ -363,46 +362,46 @@ void rendering_tick(void) {
                 (((uint16_t)CTRL_BG_TABLE) << 12) |
                 (((int16_t)ppu.nt_byte) << 4) | 
                 0x8 |
-                v.bits.fine_y);
+                v->bits.fine_y);
             ppu.bg_shifter_pat_hi = (ppu.bg_shifter_pat_hi & 0xFF00) | bg_tile_hi;
             break;
         }
 
         case 7:
             /* inc v horizontal */
-            if (v.bits.coarse_x == 31) {
-                v.bits.coarse_x = 0;
-                v.bits.nt_select ^= 1;
+            if (v->bits.coarse_x == 31) {
+                v->bits.coarse_x = 0;
+                v->bits.nt_select ^= 1;
             } else {
-                ++v.bits.coarse_x;
+                ++v->bits.coarse_x;
             }
             break;
         }
 
     } else if (ppu.cycle == 256) {
         /* inc v vertical */
-        loopy_t v = ppu.vram_addr;
-        if (v.bits.fine_y < 7) {
-            ++v.bits.fine_y;
+        loopy_t *v = &ppu.vram_addr;
+        if (v->bits.fine_y < 7) {
+            ++v->bits.fine_y;
         } else {
-            v.bits.fine_y = 0;
-            uint16_t coarse_y = v.bits.coarse_y;
+            v->bits.fine_y = 0;
+            uint16_t coarse_y = v->bits.coarse_y;
             if (coarse_y == 29) {
                 coarse_y = 0;
-                v.bits.nt_select ^= 2;
+                v->bits.nt_select ^= 2;
             } else if (coarse_y == 31) {
                 coarse_y = 0;
             } else {
                 ++coarse_y;
-                v.bits.coarse_y = coarse_y;
+                v->bits.coarse_y = coarse_y;
             }
         }
 
     } else if (ppu.cycle == 257) {
         /* copy horizontal data from loopy t to v */
-        loopy_t v = ppu.vram_addr, t = ppu.vram_temp;
-        v.bits.coarse_x = t.bits.coarse_x;
-        v.bits.nt_select = (v.bits.nt_select & 2) | (t.bits.nt_select & 1);
+        loopy_t *v = &ppu.vram_addr, t = ppu.vram_temp;
+        v->bits.coarse_x = t.bits.coarse_x;
+        v->bits.nt_select = (v->bits.nt_select & 2) | (t.bits.nt_select & 1);
     }
 }
 
@@ -448,10 +447,10 @@ void ppu_tick(void) {
         } else if (ppu.cycle > 279 && ppu.cycle < 305) {
             if (MASK_SHOW_SPR || MASK_SHOW_BG) {
                 /* copy vertical data from loopy t to v */
-                loopy_t v = ppu.vram_addr, t = ppu.vram_temp;
-                v.bits.fine_y    = t.bits.fine_y;
-                v.bits.coarse_y  = t.bits.coarse_y;
-                v.bits.nt_select = (v.bits.nt_select & 1) | (t.bits.nt_select & 2);
+                loopy_t *v = &ppu.vram_addr, t = ppu.vram_temp;
+                v->bits.fine_y    = t.bits.fine_y;
+                v->bits.coarse_y  = t.bits.coarse_y;
+                v->bits.nt_select = (v->bits.nt_select & 1) | (t.bits.nt_select & 2);
             }
 
         } else if (ppu.cycle == 339 && ppu.even_odd_toggle && MASK_SHOW_BG) {
@@ -484,6 +483,10 @@ void ppu_clear_frame_completed(void) {
 
 bool ppu_nmi(void) {
     return ppu.nmi_occured && CTRL_NMI;
+}
+
+void ppu_clear_nmi(void) {
+    ppu.nmi_occured = false;
 }
 
 uint16_t ppu_get_cycle(void) {
