@@ -81,9 +81,15 @@ enum {
 };
 
 static ppu_t ppu = { 
+    /* palette generate from http://drag.wootest.net/misc/palgen.html
+     * this format is ARGB */
+    .colors = { 0X464646, 0X0154, 0X0070, 0X7006B, 0X280048, 0X3C000E, 0X3E0000, 0X2C0000, 0XD0300, 0X1500, 0X1F00, 0X1F00, 0X1420, 0X0000, 0X0000, 0X0000, 0X9D9D9D, 0X41B0, 0X1825D5, 0X4A0DCF, 0X75009F, 0X900153, 0X920F00, 0X7B2800, 0X514400, 0X205C00, 0X6900, 0X6916, 0X5A6A, 0X0000, 0X0000, 0X0000, 0XFEFFFF, 0X4896FF, 0X626DFF, 0X8E5BFF, 0XD45EFF, 0XF160B4, 0XF36F5E, 0XDC8817, 0XB2A400, 0X7FBD00, 0X53CA28, 0X38CA76, 0X36BBCB, 0X2B2B2B, 0X0000, 0X0000, 0XFEFFFF, 0XB0D2FF, 0XB6BBFF, 0XCBB4FF, 0XEDBCFF, 0XF9BDE0, 0XFAC3BD, 0XF0CE9F, 0XDFD990, 0XCAE393, 0XB8E9A6, 0XADE9C6, 0XACE3E9, 0XA7A7A7, 0X0000, 0X0000 } };
+
+
     /* palette generate from bisquit.iki.fi/utils/nespalette/php 
      * this format is ARGB */
-    .colors = { 0xff525252, 0xff511a01, 0xff650f0f, 0xff630623, 0xff4b0336, 0xff260440, 0xff04093f, 0xff001332, 0xff00201f, 0xff002a0b, 0xff002f00, 0xff0a2e00, 0xff2d2600, 0xff000000, 0xff000000, 0xff000000, 0xffa0a0a0, 0xff9d4a1e, 0xffbc3738, 0xffb82858, 0xff942175, 0xff5c2384, 0xff242e82, 0xff003f6f, 0xff005251, 0xff006331, 0xff056b1a, 0xff2e690e, 0xff685c10, 0xff000000, 0xff000000, 0xff000000, 0xfffffffe, 0xfffc9e69, 0xffff8789, 0xffff76ae, 0xfff16dce, 0xffb270e0, 0xff707cde, 0xff3e91c8, 0xff25a7a6, 0xff28ba81, 0xff46c463, 0xff7dc154, 0xffc0b356, 0xff3c3c3c, 0xff000000, 0xff000000, 0xfffffffe, 0xfffdd6be, 0xffffcccc, 0xffffc4dd, 0xfff9c0ea, 0xffdfc1f2, 0xffc2c7f1, 0xffaad0e8, 0xff9ddad9, 0xff9ee2c9, 0xffaee6bc, 0xffc7e5b4, 0xffe4dfb5, 0xffa9a9a9, 0xff000000, 0xff000000 } };
+    /*.colors = { 0xff525252, 0xff511a01, 0xff650f0f, 0xff630623, 0xff4b0336, 0xff260440, 0xff04093f, 0xff001332, 0xff00201f, 0xff002a0b, 0xff002f00, 0xff0a2e00, 0xff2d2600, 0xff000000, 0xff000000, 0xff000000, 0xffa0a0a0, 0xff9d4a1e, 0xffbc3738, 0xffb82858, 0xff942175, 0xff5c2384, 0xff242e82, 0xff003f6f, 0xff005251, 0xff006331, 0xff056b1a, 0xff2e690e, 0xff685c10, 0xff000000, 0xff000000, 0xff000000, 0xfffffffe, 0xfffc9e69, 0xffff8789, 0xffff76ae, 0xfff16dce, 0xffb270e0, 0xff707cde, 0xff3e91c8, 0xff25a7a6, 0xff28ba81, 0xff46c463, 0xff7dc154, 0xffc0b356, 0xff3c3c3c, 0xff000000, 0xff000000, 0xfffffffe, 0xfffdd6be, 0xffffcccc, 0xffffc4dd, 0xfff9c0ea, 0xffdfc1f2, 0xffc2c7f1, 0xffaad0e8, 0xff9ddad9, 0xff9ee2c9, 0xffaee6bc, 0xffc7e5b4, 0xffe4dfb5, 0xffa9a9a9, 0xff000000, 0xff000000 } };*/
+
 
 #define CTRL_NMI              ((ppu.registers[PPUCTRL] >> 7) & 1)
 #define CTRL_MASTER           ((ppu.registers[PPUCTRL] >> 6) & 1)
@@ -139,7 +145,7 @@ ppu_bus_write(uint16_t addr, uint8_t data) {
 
 static uint32_t
 get_color_from_palette(uint8_t palette_num, uint8_t palette_index) {
-    uint16_t addr = 0x3F01 + palette_num*4 + palette_index;
+    uint16_t addr = 0x3F00 + palette_num*4 + palette_index;
     uint8_t index = ppu_bus_read(addr);
     return ppu.colors[index];
 }
@@ -157,13 +163,11 @@ void ppu_init(uint32_t *pixels) {
 
 /* used just for debug drawing palettes */
 void update_palettes(sprite_t palettes[8]) {
-    uint32_t bg_color = ppu.colors[ppu_bus_read(0x3F00)];
     for (int i=0; i<8; ++i) {
         uint32_t *pixels = palettes[i].pixels;
-        for (int p=0; p<3; ++p) {
+        for (int p=0; p<4; ++p) {
             pixels[p] = get_color_from_palette(i, p);
         }
-        pixels[3] = bg_color;
     }
 }
 
@@ -339,6 +343,7 @@ void rendering_tick(void) {
             /* attribute fetch */
             uint8_t at_byte = ppu_bus_read(0x23C0 | (v->reg & 0x0C00) | 
                 ((v->reg >> 4) & 0x38) | ((v->reg >> 2) & 0x7));
+
             ppu.bg_shifter_attr_lo = (ppu.bg_shifter_attr_lo & 0xFF00) | ((at_byte & 1) ? 0xFF : 0);
             ppu.bg_shifter_attr_hi = (ppu.bg_shifter_attr_hi & 0xFF00) | ((at_byte & 2) ? 0xFF : 0);
             break;
@@ -420,13 +425,16 @@ void render_pixel(void) {
         ((ppu.bg_shifter_pat_lo >> bitnum) & 1) |
         (((ppu.bg_shifter_pat_hi >> bitnum) & 1) << 1);
 
+    /*TODO(shaw): bg or sprite select */
+
+
+    bitnum -= 8; /* attr shifter registers are 8 bits */
     uint8_t pal_num = 
-        (((ppu.bg_shifter_attr_lo >> bitnum) & 1) << 2) |
-        (((ppu.bg_shifter_attr_hi >> bitnum) & 1) << 3);
+        ((ppu.bg_shifter_attr_lo >> bitnum) & 1) |
+        (((ppu.bg_shifter_attr_hi >> bitnum) & 1) << 1);
 
     uint32_t color = get_color_from_palette(pal_num, pal_index);
     ppu.screen_pixels[ppu.scanline * NES_WIDTH + ppu.cycle] = color;
-
 
     /*uint8_t val = rand() % 256;*/
     /*ppu.screen_pixels[ppu.scanline * NES_WIDTH + ppu.cycle] = (val << 16) | (val << 8) | val;*/
