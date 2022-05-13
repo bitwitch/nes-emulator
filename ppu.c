@@ -22,7 +22,6 @@
 
 /*
  *  Loopy Registers:
- *      11 00000 00000
  *  yyy NN YYYYY XXXXX
  *  ||| || ||||| +++++-- coarse X scroll
  *  ||| || +++++-------- coarse Y scroll
@@ -54,15 +53,12 @@ typedef struct {
     bool nmi_occured;
     uint16_t cycle, scanline;
 
-    /* temp */
-    uint16_t address;
-    /* temp */
-
     loopy_t vram_addr, vram_temp;
     uint8_t fine_x;
     bool offset_toggle; /* used for writing low or high byte into address */
 
-    uint8_t nt_byte;
+    uint8_t nt_byte, at_byte;
+    uint8_t bg_tile_lo, bg_tile_hi; /* pattern table data fed to shifters */
     uint16_t bg_shifter_pat_lo;
     uint16_t bg_shifter_pat_hi;
     uint8_t bg_shifter_attr_lo;
@@ -81,15 +77,9 @@ enum {
 };
 
 static ppu_t ppu = { 
-    /* palette generate from http://drag.wootest.net/misc/palgen.html
+    /* palette generated from http://drag.wootest.net/misc/palgen.html
      * this format is ARGB */
-    .colors = { 0X464646, 0X0154, 0X0070, 0X7006B, 0X280048, 0X3C000E, 0X3E0000, 0X2C0000, 0XD0300, 0X1500, 0X1F00, 0X1F00, 0X1420, 0X0000, 0X0000, 0X0000, 0X9D9D9D, 0X41B0, 0X1825D5, 0X4A0DCF, 0X75009F, 0X900153, 0X920F00, 0X7B2800, 0X514400, 0X205C00, 0X6900, 0X6916, 0X5A6A, 0X0000, 0X0000, 0X0000, 0XFEFFFF, 0X4896FF, 0X626DFF, 0X8E5BFF, 0XD45EFF, 0XF160B4, 0XF36F5E, 0XDC8817, 0XB2A400, 0X7FBD00, 0X53CA28, 0X38CA76, 0X36BBCB, 0X2B2B2B, 0X0000, 0X0000, 0XFEFFFF, 0XB0D2FF, 0XB6BBFF, 0XCBB4FF, 0XEDBCFF, 0XF9BDE0, 0XFAC3BD, 0XF0CE9F, 0XDFD990, 0XCAE393, 0XB8E9A6, 0XADE9C6, 0XACE3E9, 0XA7A7A7, 0X0000, 0X0000 } };
-
-
-    /* palette generate from bisquit.iki.fi/utils/nespalette/php 
-     * this format is ARGB */
-    /*.colors = { 0xff525252, 0xff511a01, 0xff650f0f, 0xff630623, 0xff4b0336, 0xff260440, 0xff04093f, 0xff001332, 0xff00201f, 0xff002a0b, 0xff002f00, 0xff0a2e00, 0xff2d2600, 0xff000000, 0xff000000, 0xff000000, 0xffa0a0a0, 0xff9d4a1e, 0xffbc3738, 0xffb82858, 0xff942175, 0xff5c2384, 0xff242e82, 0xff003f6f, 0xff005251, 0xff006331, 0xff056b1a, 0xff2e690e, 0xff685c10, 0xff000000, 0xff000000, 0xff000000, 0xfffffffe, 0xfffc9e69, 0xffff8789, 0xffff76ae, 0xfff16dce, 0xffb270e0, 0xff707cde, 0xff3e91c8, 0xff25a7a6, 0xff28ba81, 0xff46c463, 0xff7dc154, 0xffc0b356, 0xff3c3c3c, 0xff000000, 0xff000000, 0xfffffffe, 0xfffdd6be, 0xffffcccc, 0xffffc4dd, 0xfff9c0ea, 0xffdfc1f2, 0xffc2c7f1, 0xffaad0e8, 0xff9ddad9, 0xff9ee2c9, 0xffaee6bc, 0xffc7e5b4, 0xffe4dfb5, 0xffa9a9a9, 0xff000000, 0xff000000 } };*/
-
+    .colors = { 0x464646, 0x000154, 0x000070, 0x07006b, 0x280048, 0x3c000e, 0x3e0000, 0x2c0000, 0x0d0300, 0x001500, 0x001f00, 0x001f00, 0x001420, 0x000000, 0x000000, 0x000000, 0x9d9d9d, 0x0041b0, 0x1825d5, 0x4a0dcf, 0x75009f, 0x900153, 0x920f00, 0x7b2800, 0x514400, 0x205c00, 0x006900, 0x006916, 0x005a6a, 0x000000, 0x000000, 0x000000, 0xfeffff, 0x4896ff, 0x626dff, 0x8e5bff, 0xd45eff, 0xf160b4, 0xf36f5e, 0xdc8817, 0xb2a400, 0x7fbd00, 0x53ca28, 0x38ca76, 0x36bbcb, 0x2b2b2b, 0x000000, 0x000000, 0xfeffff, 0xb0d2ff, 0xb6bbff, 0xcbb4ff, 0xedbcff, 0xf9bde0, 0xfac3bd, 0xf0ce9f, 0xdfd990, 0xcae393, 0xb8e9a6, 0xade9c6, 0xace3e9, 0xa7a7a7, 0x000000, 0x000000 } };
 
 #define CTRL_NMI              ((ppu.registers[PPUCTRL] >> 7) & 1)
 #define CTRL_MASTER           ((ppu.registers[PPUCTRL] >> 6) & 1)
@@ -328,12 +318,24 @@ void ppu_write(uint16_t addr, uint8_t data) {
  *  +--------------- 0: Pattern table is at $0000-$1FFF
  */
 void rendering_tick(void) {
+    /* TODO(shaw): cycles 337 - 340 are actually both unused NT fetches
+     * i think i read that some games might use these fetches for timing though
+     * so i should implement these nt reads */
+
     if (ppu.cycle > 0 && (ppu.cycle < 256 || ppu.cycle > 320)) {
+
         ppu.bg_shifter_pat_lo <<= 1; ppu.bg_shifter_pat_hi <<= 1;
         ppu.bg_shifter_attr_lo <<= 1; ppu.bg_shifter_attr_hi <<= 1;
+
         loopy_t *v = &ppu.vram_addr;
         switch ((ppu.cycle - 1) % 8) {
         case 0:
+            /* load current tile into shifters */
+            ppu.bg_shifter_attr_lo = (ppu.bg_shifter_attr_lo & 0xFF00) | ((ppu.at_byte & 1) ? 0xFF : 0);
+            ppu.bg_shifter_attr_hi = (ppu.bg_shifter_attr_hi & 0xFF00) | ((ppu.at_byte & 2) ? 0xFF : 0);
+            ppu.bg_shifter_pat_lo = (ppu.bg_shifter_pat_lo & 0xFF00) | ppu.bg_tile_lo;
+            ppu.bg_shifter_pat_hi = (ppu.bg_shifter_pat_hi & 0xFF00) | ppu.bg_tile_hi;
+
             /* nametable fetch */
             ppu.nt_byte = ppu_bus_read(0x2000 | (v->reg & 0x0FFF));
             break;
@@ -341,64 +343,55 @@ void rendering_tick(void) {
         case 2:
         {
             /* attribute fetch */
-            uint8_t at_byte = ppu_bus_read(0x23C0 | (v->reg & 0x0C00) | 
-                ((v->reg >> 4) & 0x38) | ((v->reg >> 2) & 0x7));
+            ppu.at_byte = ppu_bus_read(
+                0x23C0 |                    /* start of attribute table */
+                (v->reg & 0x0C00) |         /* nametable select */
+                ((v->reg >> 4) & 0x38) |    /* 3 high bits of coarse y */
+                ((v->reg >> 2) & 0x7));     /* 3 high bits of coarse x */
 
-            ppu.bg_shifter_attr_lo = (ppu.bg_shifter_attr_lo & 0xFF00) | ((at_byte & 1) ? 0xFF : 0);
-            ppu.bg_shifter_attr_hi = (ppu.bg_shifter_attr_hi & 0xFF00) | ((at_byte & 2) ? 0xFF : 0);
+            /* select the corresponding tile within the 2x2 tile square fetched from attribute table */
+            if (v->bits.coarse_y & 2) ppu.at_byte >>= 4;
+            if (v->bits.coarse_x & 2) ppu.at_byte >>= 2;
+
             break;
         }
 
         case 4:
         {
             /* low bg tile byte */
-            uint8_t bg_tile_lo = ppu_bus_read(
+            ppu.bg_tile_lo = ppu_bus_read(
                 (((uint16_t)CTRL_BG_TABLE) << 12) |
                 (((int16_t)ppu.nt_byte) << 4) | 
                 v->bits.fine_y);
-            ppu.bg_shifter_pat_lo = (ppu.bg_shifter_pat_lo & 0xFF00) | bg_tile_lo;
             break;
         }
 
         case 6:
         {
             /* high bg tile byte */
-            uint8_t bg_tile_hi = ppu_bus_read(
+            ppu.bg_tile_hi = ppu_bus_read(
                 (((uint16_t)CTRL_BG_TABLE) << 12) |
                 (((int16_t)ppu.nt_byte) << 4) | 
                 0x8 |
                 v->bits.fine_y);
-            ppu.bg_shifter_pat_hi = (ppu.bg_shifter_pat_hi & 0xFF00) | bg_tile_hi;
             break;
         }
 
         case 7:
-            /* inc v horizontal */
-            if (v->bits.coarse_x == 31) {
-                v->bits.coarse_x = 0;
+            /* inc v horizontal, switch nametable if wraps */
+            if (++v->bits.coarse_x == 0)
                 v->bits.nt_select ^= 1;
-            } else {
-                ++v->bits.coarse_x;
-            }
             break;
         }
 
     } else if (ppu.cycle == 256) {
         /* inc v vertical */
         loopy_t *v = &ppu.vram_addr;
-        if (v->bits.fine_y < 7) {
-            ++v->bits.fine_y;
-        } else {
-            v->bits.fine_y = 0;
-            uint16_t coarse_y = v->bits.coarse_y;
-            if (coarse_y == 29) {
-                coarse_y = 0;
+
+        if (++v->bits.fine_y == 0) {
+            if (++v->bits.coarse_y == 30) {
+                v->bits.coarse_y = 0;
                 v->bits.nt_select ^= 2;
-            } else if (coarse_y == 31) {
-                coarse_y = 0;
-            } else {
-                ++coarse_y;
-                v->bits.coarse_y = coarse_y;
             }
         }
 
@@ -427,7 +420,6 @@ void render_pixel(void) {
 
     /*TODO(shaw): bg or sprite select */
 
-
     bitnum -= 8; /* attr shifter registers are 8 bits */
     uint8_t pal_num = 
         ((ppu.bg_shifter_attr_lo >> bitnum) & 1) |
@@ -441,7 +433,7 @@ void render_pixel(void) {
 }
 
 void ppu_tick(void) {
-    if (ppu.scanline < 240) { 
+    if (ppu.scanline < 240) {
         if (MASK_SHOW_SPR || MASK_SHOW_BG) rendering_tick();
         if (ppu.cycle < 256) render_pixel();
     } else if (ppu.scanline == 241 && ppu.cycle == 1) {
