@@ -61,8 +61,8 @@ typedef struct {
     uint8_t bg_tile_lo, bg_tile_hi; /* pattern table data fed to shifters */
     uint16_t bg_shifter_pat_lo;
     uint16_t bg_shifter_pat_hi;
-    uint8_t bg_shifter_attr_lo;
-    uint8_t bg_shifter_attr_hi;
+    uint16_t bg_shifter_attr_lo;
+    uint16_t bg_shifter_attr_hi;
 } ppu_t;
 
 enum {
@@ -290,7 +290,6 @@ void ppu_write(uint16_t addr, uint8_t data) {
                 ppu.vram_temp.reg = (ppu.vram_temp.reg & 0xFF00) | data;
                 ppu.vram_addr.reg = ppu.vram_temp.reg;
             } else {
-                /* NOTE(shaw): might need to cast data to uint16_t */
                 ppu.vram_temp.reg = (ppu.vram_temp.reg & 0x00FF) | ((uint16_t)(data & 0x3F) << 8);
             }
 
@@ -305,7 +304,6 @@ void ppu_write(uint16_t addr, uint8_t data) {
             break;
     }
 }
-
 
 /*
  *  PPU Addresses within the pattern tables
@@ -352,6 +350,7 @@ void rendering_tick(void) {
             /* select the corresponding tile within the 2x2 tile square fetched from attribute table */
             if (v->bits.coarse_y & 2) ppu.at_byte >>= 4;
             if (v->bits.coarse_x & 2) ppu.at_byte >>= 2;
+            ppu.at_byte &= 3;
 
             break;
         }
@@ -420,16 +419,12 @@ void render_pixel(void) {
 
     /*TODO(shaw): bg or sprite select */
 
-    bitnum -= 8; /* attr shifter registers are 8 bits */
     uint8_t pal_num = 
         ((ppu.bg_shifter_attr_lo >> bitnum) & 1) |
         (((ppu.bg_shifter_attr_hi >> bitnum) & 1) << 1);
 
     uint32_t color = get_color_from_palette(pal_num, pal_index);
     ppu.screen_pixels[ppu.scanline * NES_WIDTH + ppu.cycle] = color;
-
-    /*uint8_t val = rand() % 256;*/
-    /*ppu.screen_pixels[ppu.scanline * NES_WIDTH + ppu.cycle] = (val << 16) | (val << 8) | val;*/
 }
 
 void ppu_tick(void) {
