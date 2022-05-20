@@ -34,7 +34,20 @@ uint8_t bus_read(uint16_t addr) {
     else if (addr < 0x4000)
         return ppu_read((addr-0x2000)&0xF);
     else if (addr < 0x4020) {
-        /* apu or i/o */
+        switch (addr) {
+            case 0x4014: break;
+            case 0x4015: 
+                /* apu read */
+                break;
+            case 0x4016: 
+                /* controller 0 read */
+                break;
+            case 0x4017: 
+                /* controller 1 read */
+                break;
+            default: 
+                break;
+        }
     } 
     else 
         return cart_read(addr);
@@ -47,7 +60,30 @@ void bus_write(uint16_t addr, uint8_t data) {
     else if (addr < 0x4000)
         ppu_write((addr-0x2000)&0xF, data);
     else if (addr < 0x4020) {
-        /* apu or i/o */
+        switch (addr) {
+            case 0x4014: 
+            {
+                /* OAMDMA: Copy 256 bytes from cpu ram into ppu sprite memory */
+                for(uint16_t b=0; b<256; ++b) {
+                    /* NOTE(shaw): bisqwits emulator only uses low 3 bits??
+                     * bus_read((data&7)*0x0100+b) */
+                    bus_write(0x2004, bus_read(0x100*data + b));
+                }
+                break;
+            }
+            case 0x4015: 
+                /* apu write */
+                break;
+            case 0x4016: 
+                /* controller 0 write?? */
+                break;
+            case 0x4017: 
+                /* controller 1 write?? */
+                break;
+            default: 
+                /* apu write */
+                break;
+        }
     } 
     else 
         cart_write(addr, data);

@@ -44,6 +44,7 @@ typedef struct {
     uint8_t OAM[256];
     uint8_t registers[9];
     uint8_t OAMDMA;
+    uint8_t oam_addr;
     uint8_t data_buffer;
 
     uint32_t colors[64];
@@ -234,6 +235,7 @@ uint8_t ppu_read(uint16_t addr) {
         case OAMADDR: 
             break;
         case OAMDATA: 
+            data = ppu.OAM[ppu.oam_addr];
             break;
         case PPUSCROLL: 
             break;
@@ -269,8 +271,10 @@ void ppu_write(uint16_t addr, uint8_t data) {
         case PPUSTATUS:
             break;
         case OAMADDR:
+            ppu.oam_addr = data;
             break;
         case OAMDATA:
+            ppu.OAM[ppu.oam_addr++] = data;
             break;
         case PPUSCROLL:
         {
