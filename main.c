@@ -27,6 +27,7 @@ extern FILE *logfile;
 
 static char *cpu_state_lines[MAX_CPU_STATE_LINES];
 
+
 void init_debug_sidebar(sprite_t pattern_tables[2], sprite_t palettes[8], sprite_t *code_quad);
 void render_cpu_state(cpu_t *cpu, char **cpu_state_lines);
 void render_code(uint16_t addr, dasm_map_t *dasm);
@@ -40,8 +41,6 @@ int main(int argc, char **argv) {
     cpu_t cpu;
     read_rom_file(argv[1]);
     io_init();
-    platform_state_t platform_state = {0};
-    platform_state_t last_platform_state = {0};
 
     /* LEAK: disassemble allocates memory for strings */
     dasm_map_t *dasm = disassemble(0x8000, 0xFFFF);
@@ -88,7 +87,7 @@ int main(int argc, char **argv) {
 
     for (;;) {
         last_platform_state = platform_state;
-        do_input(&platform_state);
+        do_input();
 
         /* transfer states */
         if (platform_state.enter && !last_platform_state.enter)

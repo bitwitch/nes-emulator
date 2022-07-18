@@ -27,7 +27,24 @@ typedef struct {
     bool space;
     bool f;
     bool escape;
+
+    uint8_t controller_states[2];
 } platform_state_t;
+
+typedef enum {
+    CONTROLLER_A      = 1 << 7,
+    CONTROLLER_B      = 1 << 6,
+    CONTROLLER_SELECT = 1 << 5,
+    CONTROLLER_START  = 1 << 4,
+    CONTROLLER_UP     = 1 << 3,
+    CONTROLLER_DOWN   = 1 << 2,
+    CONTROLLER_LEFT   = 1 << 1,
+    CONTROLLER_RIGHT  = 1 << 0
+} controller_buttons_t;
+
+extern platform_state_t platform_state;
+extern platform_state_t last_platform_state;
+extern uint8_t controller_registers[2]; /* parallel to serial shift registers */
 
 void io_init(void);
 void io_deinit(void);
@@ -35,7 +52,9 @@ void prepare_drawing(void);
 void render_sprites(void);
 void draw(void);
 uint64_t get_ticks(void);
-void do_input(platform_state_t *platform_state);
+void controller_write(int controller_index, uint8_t data);
+uint8_t controller_read(int controller_index);
+void do_input();
 sprite_t make_sprite(uint32_t *pixels, int w, int h,
                      int dest_x, int dest_y, int dest_w, int dest_h);
 void register_sprite(sprite_t *sprite);

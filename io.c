@@ -4,6 +4,12 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
+static struct {
+    int w, h, bytes_per_pixel;
+    SDL_Texture *texture;
+    SDL_Rect glyphs[95];
+} font;
+
 static SDL_Window *window;
 static SDL_Renderer *renderer;
 
@@ -11,13 +17,11 @@ static SDL_Renderer *renderer;
 static sprite_t *sprites[MAX_SPRITES];
 static int sprite_count;
 
-static struct {
-    int w, h, bytes_per_pixel;
-    SDL_Texture *texture;
-    SDL_Rect glyphs[95];
-} font;
+platform_state_t platform_state;
+platform_state_t last_platform_state;
+uint8_t controller_registers[2];
 
-void generate_font_glyphs(void);
+static void generate_font_glyphs(void);
 
 void io_init(void) {
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
@@ -41,6 +45,10 @@ void io_init(void) {
         fprintf(stderr, "Failed to create renderer: %s\n", SDL_GetError());
         exit(1);
     }
+
+    
+    memset(&platform_state, 0, sizeof(platform_state));
+    memset(&last_platform_state, 0, sizeof(last_platform_state));
 
     uint8_t *font_pixels = stbi_load("font.png", &font.w, &font.h, &font.bytes_per_pixel, STBI_rgb);
     if (!font_pixels)
@@ -69,7 +77,11 @@ void io_init(void) {
     signal(SIGINT, SIG_DFL);
 }
 
-void do_input(platform_state_t *platform_state) {
+/* TODO(shaw): platform_state is now global, doesn't need to be passed in here */
+
+/* do_input is the platform level input handler that will keep the current
+ * input states up to date in platform_state */
+void do_input() {
     SDL_Event event;
 
     while (SDL_PollEvent(&event)) {
@@ -84,30 +96,76 @@ void do_input(platform_state_t *platform_state) {
             if (event.key.repeat == 0) {
                 switch(event.key.keysym.scancode) {
                 case SDL_SCANCODE_RETURN:
-                    platform_state->enter = event.type == SDL_KEYDOWN;
+                    platform_state.enter = event.type == SDL_KEYDOWN;
                     break;
                 case SDL_SCANCODE_SPACE:
-                    platform_state->space = event.type == SDL_KEYDOWN;
+                    platform_state.space = event.type == SDL_KEYDOWN;
                     break;
                 case SDL_SCANCODE_F:
-                    platform_state->f = event.type == SDL_KEYDOWN;
+                    platform_state.f = event.type == SDL_KEYDOWN;
                     break;
+
+                /* controller buttons */
+
                 case SDL_SCANCODE_UP:
-                    /*game.up = event.type == SDL_KEYDOWN;*/
+                {
+                    uint8_t mask = event.type == SDL_KEYDOWN ? CONTROLLER_UP : 0;
+                    platform_state.controller_states[0] = 
+                        (platform_state.controller_states[0] & ~CONTROLLER_UP) | mask;
                     break;
+                } 
                 case SDL_SCANCODE_DOWN:
-                    /*game.down = event.type == SDL_KEYDOWN;*/
+                {
+                    uint8_t mask = event.type == SDL_KEYDOWN ? CONTROLLER_DOWN : 0;
+                    platform_state.controller_states[0] = 
+                        (platform_state.controller_states[0] & ~CONTROLLER_DOWN) | mask;
                     break;
+                } 
                 case SDL_SCANCODE_LEFT:
-                    /*game.left = event.type == SDL_KEYDOWN;*/
+                {
+                    uint8_t mask = event.type == SDL_KEYDOWN ? CONTROLLER_LEFT : 0;
+                    platform_state.controller_states[0] = 
+                        (platform_state.controller_states[0] & ~CONTROLLER_LEFT) | mask;
                     break;
+                } 
                 case SDL_SCANCODE_RIGHT:
-                    /*game.right = event.type == SDL_KEYDOWN;*/
+                {
+                    uint8_t mask = event.type == SDL_KEYDOWN ? CONTROLLER_RIGHT : 0;
+                    platform_state.controller_states[0] = 
+                        (platform_state.controller_states[0] & ~CONTROLLER_RIGHT) | mask;
                     break;
+                } 
+                case SDL_SCANCODE_S:
+                {
+                    uint8_t mask = event.type == SDL_KEYDOWN ? CONTROLLER_SELECT : 0;
+                    platform_state.controller_states[0] = 
+                        (platform_state.controller_states[0] & ~CONTROLLER_SELECT) | mask;
+                    break;
+                } 
+                case SDL_SCANCODE_D:
+                {
+                    uint8_t mask = event.type == SDL_KEYDOWN ? CONTROLLER_START : 0;
+                    platform_state.controller_states[0] = 
+                        (platform_state.controller_states[0] & ~CONTROLLER_START) | mask;
+                    break;
+                } 
+                case SDL_SCANCODE_A:
+                {
+                    uint8_t mask = event.type == SDL_KEYDOWN ? CONTROLLER_A : 0;
+                    platform_state.controller_states[0] = 
+                        (platform_state.controller_states[0] & ~CONTROLLER_A) | mask;
+                    break;
+                } 
+                case SDL_SCANCODE_B:
+                {
+                    uint8_t mask = event.type == SDL_KEYDOWN ? CONTROLLER_B : 0;
+                    platform_state.controller_states[0] = 
+                        (platform_state.controller_states[0] & ~CONTROLLER_B) | mask;
+                    break;
+                } 
                 default:
                     break;
                 }
-
             }
             break;
 
@@ -115,6 +173,25 @@ void do_input(platform_state_t *platform_state) {
             break;
         }
     }
+}
+
+void controller_write(int controller_index, uint8_t data) {
+    assert(controller_index == 0 || controller_index == 1);
+    if (data & 1) {
+        /* 1 means continually poll controller for current button states, since
+         * this is already done every frame by do_input, we do nothing here */
+    } else {
+        /* 0 means switch to serial mode, and we simulate this by making a copy
+         * of the button states when a 0 is written, that can be used as a
+         * shift register */
+        controller_registers[controller_index] = platform_state.controller_states[controller_index];
+    }
+}
+
+uint8_t controller_read(int controller_index) {
+    uint8_t result = (controller_registers[controller_index] >> 7) & 1;
+    controller_registers[controller_index] <<= 1;
+    return result;
 }
 
 uint64_t get_ticks(void) {
@@ -138,7 +215,7 @@ void draw(void) {
     SDL_RenderPresent(renderer);
 }
 
-void generate_font_glyphs(void) {
+static void generate_font_glyphs(void) {
     for (int i=0; i<95; ++i) {
         int col = i % (font.w/FONT_CHAR_WIDTH);
         int row = i / (font.w/FONT_CHAR_WIDTH);
