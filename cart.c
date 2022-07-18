@@ -130,10 +130,14 @@ uint8_t cart_read(uint16_t addr) {
 void cart_write(uint16_t addr, uint8_t data) {
     /* TODO(shaw): implement this correctly based on each mapper */
 
-    if (addr < 0x6000)
+    if (addr < 0x2000) 
+        cart.chr_rom[addr] = data;
+    else if (addr < 0x6000)
         assert(0 && "this part of cart memory not implemented");
-    if (addr < 0x8000)
+    else if (addr < 0x8000)
         cart.prg_ram[addr - 0x6000] = data;
+    else if (addr < 0xC000)
+        cart.prg_rom[addr - 0x8000] = data;
     else 
         cart.prg_rom[addr - 0xC000] = data;
 

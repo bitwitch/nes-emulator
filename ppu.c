@@ -121,7 +121,7 @@ ppu_bus_read(uint16_t addr) {
 static void 
 ppu_bus_write(uint16_t addr, uint8_t data) {
     if (addr < 0x2000) {
-        /*cart_write()*/
+        cart_write(addr, data);
     } else if (addr < 0x3F00) {
         /* TODO(shaw): do this with mappers 
          * right now, just hardcoding vertical mirroring */
@@ -129,26 +129,31 @@ ppu_bus_write(uint16_t addr, uint8_t data) {
         ppu.vram[addr] = data;
     } else {
         addr = (addr - 0x3F00) & 0x1F;
-        if (addr % 4 == 0) addr = 0;
+        /* Addresses $3F04/$3F08/$3F0C can contain unique data */
+        /* Addresses $3F10/$3F14/$3F18/$3F1C are mirrors of $3F00/$3F04/$3F08/$3F0C */
+        if (addr > 0x0F && addr % 4 == 0)
+            addr -= 0x10;
         ppu.palette_ram[addr] = data;
     }
 }
 
 static uint32_t
 get_color_from_palette(uint8_t palette_num, uint8_t palette_index) {
-    uint16_t addr = 0x3F00 + palette_num*4 + palette_index;
-    uint8_t index = ppu_bus_read(addr);
+    uint16_t addr = palette_num*4 + palette_index;
+    if (addr > 0x0F && addr % 4 == 0)
+        addr -= 0x10;
+    uint8_t index = ppu.palette_ram[addr];
     return ppu.colors[index];
 }
 
 void ppu_init(uint32_t *pixels) {
     ppu.screen_pixels = pixels;
     /* initialize with some random colors to visualize palette on load */
-    for (int i=0; i<32; ++i) {
-        int r = rand();
-        ppu.palette_ram[i] = (uint8_t)(r >> 6);
-        /*ppu.palette_ram[i] = (uint8_t)pixels[i];*/
-    }
+    /*for (int i=0; i<32; ++i) {*/
+        /*int r = rand();*/
+        /*ppu.palette_ram[i] = (uint8_t)(r >> 6);*/
+        /*[>ppu.palette_ram[i] = (uint8_t)pixels[i];<]*/
+    /*}*/
 }
 
 
