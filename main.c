@@ -31,6 +31,7 @@ static char *cpu_state_lines[MAX_CPU_STATE_LINES];
 void init_debug_sidebar(sprite_t pattern_tables[2], sprite_t palettes[8], sprite_t *code_quad);
 void render_cpu_state(cpu_t *cpu, char **cpu_state_lines);
 void render_code(uint16_t addr, dasm_map_t *dasm);
+void render_oam_info(void);
 
 int main(int argc, char **argv) {
     if (argc < 2) {
@@ -127,7 +128,8 @@ int main(int argc, char **argv) {
                 prepare_drawing();
                 render_sprites();
                 render_cpu_state(&cpu, cpu_state_lines);
-                render_code(cpu.pc, dasm);
+                /*render_code(cpu.pc, dasm);*/
+                render_oam_info();
                 draw();
 
                 frame_prepared = false;
@@ -167,7 +169,8 @@ int main(int argc, char **argv) {
                 prepare_drawing();
                 render_sprites();
                 render_cpu_state(&cpu, cpu_state_lines);
-                render_code(cpu.pc, dasm);
+                /*render_code(cpu.pc, dasm);*/
+                render_oam_info();
                 draw();
                 last_frame_time += MS_PER_FRAME;
                 /* NOTE(shaw): since get_ticks is a uint64_t and only has
@@ -204,7 +207,8 @@ int main(int argc, char **argv) {
                 prepare_drawing();
                 render_sprites();
                 render_cpu_state(&cpu, cpu_state_lines);
-                render_code(cpu.pc, dasm);
+                /*render_code(cpu.pc, dasm);*/
+                render_oam_info();
                 draw();
 
                 frame_prepared = false;
@@ -327,6 +331,27 @@ void render_cpu_state(cpu_t *cpu, char **lines) {
     }
     #undef PAD
 }   
+
+void render_oam_info(void) {
+    int i;
+    uint8_t y,tile_id,attr,x;
+    char line[MAX_DEBUG_LINE_CHARS+1];
+    uint8_t *oam = ppu_get_oam();
+    
+    #define PAD (0.0133333*NES_WIDTH*SCALE*(1-NES_DEBUG_RATIO)/(NES_DEBUG_RATIO))
+    for (i=0; i<MAX_CODE_LINES; ++i) {
+        y       = oam[i*4];
+        tile_id = oam[i*4+1];
+        attr    = oam[i*4+2];
+        x       = oam[i*4+3];
+        
+        snprintf(line, MAX_DEBUG_LINE_CHARS+1, "(%3d,%3d) %2X %2X", x,y,tile_id,attr);
+        render_text(line, 
+            NES_WIDTH*SCALE+PAD, 
+            i*FONT_CHAR_HEIGHT*SCALE + 7*FONT_CHAR_HEIGHT*SCALE + PAD);
+    }
+    #undef PAD
+}
 
 void render_code(uint16_t addr, dasm_map_t *dasm) {
     int ins_index = hmgeti(dasm, addr);

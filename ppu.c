@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <stdbool.h>
 #include <stdlib.h> /* for rand */
 #include "ppu.h"
@@ -41,11 +42,17 @@ typedef union {
 typedef struct {
     uint8_t vram[2048];
     uint8_t palette_ram[32];
-    uint8_t OAM[256];
     uint8_t registers[9];
-    uint8_t OAMDMA;
-    uint8_t oam_addr;
     uint8_t data_buffer;
+
+    /* OAM format */
+    /* byte 0: y position (top) */
+    /* byte 1: tile_id */
+    /* byte 2: attributes */
+    /* byte 3: x position (left) */
+    uint8_t oam[256];
+    uint8_t oam_addr;
+    /*uint8_t oam_dma;*/
 
     uint32_t colors[64];
     uint32_t *screen_pixels;
@@ -221,8 +228,9 @@ void update_pattern_tables(int selected_palette, sprite_t pattern_tables[2]) {
     }
 }
 
-/* reads from cpu, addr is 0-7 */
+
 uint8_t ppu_read(uint16_t addr) {
+    assert(addr <= 7);
     uint8_t data = 0;
     switch (addr) {
         case PPUCTRL: 
@@ -240,7 +248,7 @@ uint8_t ppu_read(uint16_t addr) {
         case OAMADDR: 
             break;
         case OAMDATA: 
-            data = ppu.OAM[ppu.oam_addr];
+            data = ppu.oam[ppu.oam_addr];
             break;
         case PPUSCROLL: 
             break;
@@ -261,8 +269,8 @@ uint8_t ppu_read(uint16_t addr) {
 }
 
 
-/* writes from cpu, addr is 0-7 */
 void ppu_write(uint16_t addr, uint8_t data) {
+    assert(addr <= 7);
     switch (addr) {
         case PPUCTRL: 
         {
@@ -279,7 +287,7 @@ void ppu_write(uint16_t addr, uint8_t data) {
             ppu.oam_addr = data;
             break;
         case OAMDATA:
-            ppu.OAM[ppu.oam_addr++] = data;
+            ppu.oam[ppu.oam_addr++] = data;
             break;
         case PPUSCROLL:
         {
@@ -508,6 +516,10 @@ uint16_t ppu_get_cycle(void) {
 
 uint16_t ppu_get_scanline(void) {
     return ppu.scanline;
+}
+
+uint8_t *ppu_get_oam(void) {
+    return ppu.oam;
 }
 
 

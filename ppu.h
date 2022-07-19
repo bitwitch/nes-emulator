@@ -17,4 +17,7 @@ void ppu_clear_nmi(void);
 void update_palettes(sprite_t palettes[8]);
 void update_pattern_tables(int selected_palette, sprite_t pattern_tables[2]);
 
+/* for debug sidebar to render oam info */
+uint8_t *ppu_get_oam(void);
+
 #endif
