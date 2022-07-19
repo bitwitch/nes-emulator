@@ -206,7 +206,7 @@ void render_sprites(void) {
     for (int i=0; i<sprite_count; ++i) {
         sprite_t *s = sprites[i];
         SDL_UpdateTexture(s->texture, NULL, s->pixels, s->w * sizeof(uint32_t));
-        SDL_RenderCopy(renderer, s->texture, NULL, &s->dstrect);
+        SDL_RenderCopy(renderer, s->texture, &s->srcrect, &s->dstrect);
     }
 
 }
@@ -229,7 +229,12 @@ static void generate_font_glyphs(void) {
     }
 }
 
-sprite_t make_sprite(uint32_t *pixels, int w, int h, int dest_x, int dest_y, int dest_w, int dest_h) {
+
+/* a subsprite renders a rectangle out of a potentially larger texture */
+sprite_t make_sub_sprite(uint32_t *pixels, int w, int h, 
+                     int src_x, int src_y, int src_w, int src_h,
+                     int dest_x, int dest_y, int dest_w, int dest_h) 
+{
     sprite_t s;
     s.pixels = pixels;
     s.surface = SDL_CreateRGBSurfaceFrom(
@@ -255,8 +260,18 @@ sprite_t make_sprite(uint32_t *pixels, int w, int h, int dest_x, int dest_y, int
     }
     s.w = w;
     s.h = h;
+    s.srcrect = (SDL_Rect){ src_x, src_y, src_w, src_h };
     s.dstrect = (SDL_Rect){ dest_x, dest_y, dest_w, dest_h };
     return s;
+}
+
+sprite_t make_sprite(uint32_t *pixels, int w, int h, 
+                     int dest_x, int dest_y, int dest_w, int dest_h) 
+{
+    return make_sub_sprite(
+        pixels, w, h, 
+        0, 0, dest_w, dest_h,
+        dest_x, dest_y, dest_w, dest_h);
 }
 
 void register_sprite(sprite_t *sprite) {

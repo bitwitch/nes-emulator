@@ -13,7 +13,7 @@
 
 #define MAX_CPU_STATE_LINES 36
 #define MAX_DEBUG_LINE_CHARS 34
-#define MAX_CODE_LINES 12
+#define MAX_CODE_LINES 10
 
 typedef enum {
     EM_RUN,
@@ -56,9 +56,12 @@ int main(int argc, char **argv) {
     }
     cpu_state_lines[MAX_CPU_STATE_LINES-1] = NULL;
 
-    uint32_t *pixels = malloc(NES_WIDTH*NES_HEIGHT*sizeof(uint32_t));
+    uint32_t *pixels = malloc(PPU_WIDTH*PPU_HEIGHT*sizeof(uint32_t));
     if (!pixels) { perror("malloc"); exit(1); }
-    sprite_t nes_quad = make_sprite(pixels, NES_WIDTH, NES_HEIGHT, 
+    int vertical_overscan = 0.5*(PPU_HEIGHT - NES_HEIGHT);
+    int horizontal_overscan = 0.5*(PPU_WIDTH - NES_WIDTH);
+    sprite_t nes_quad = make_sub_sprite(pixels, PPU_WIDTH, PPU_HEIGHT, 
+        horizontal_overscan, vertical_overscan, NES_WIDTH, NES_HEIGHT,
         0, 0, NES_WIDTH*SCALE, NES_HEIGHT*SCALE);
     register_sprite(&nes_quad);
 

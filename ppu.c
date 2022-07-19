@@ -325,11 +325,7 @@ void ppu_write(uint16_t addr, uint8_t data) {
  *  +--------------- 0: Pattern table is at $0000-$1FFF
  */
 void rendering_tick(void) {
-    /* TODO(shaw): cycles 337 - 340 are actually both unused NT fetches
-     * i think i read that some games might use these fetches for timing though
-     * so i should implement these nt reads */
-
-    if (ppu.cycle > 0 && (ppu.cycle < 256 || ppu.cycle > 320)) {
+    if (ppu.cycle > 0 && (ppu.cycle < 256 || ppu.cycle > 320) && ppu.cycle < 337) {
 
         ppu.bg_shifter_pat_lo <<= 1; ppu.bg_shifter_pat_hi <<= 1;
         ppu.bg_shifter_attr_lo <<= 1; ppu.bg_shifter_attr_hi <<= 1;
@@ -390,7 +386,11 @@ void rendering_tick(void) {
             if (++v->bits.coarse_x == 0)
                 v->bits.nt_select ^= 1;
             break;
+
+        default:
+            break;
         }
+
 
     } else if (ppu.cycle == 256) {
         /* inc v vertical */
@@ -408,6 +408,11 @@ void rendering_tick(void) {
         loopy_t *v = &ppu.vram_addr, t = ppu.vram_temp;
         v->bits.coarse_x = t.bits.coarse_x;
         v->bits.nt_select = (v->bits.nt_select & 2) | (t.bits.nt_select & 1);
+
+    } else if (ppu.cycle == 337 || ppu.cycle == 339) {
+        /* unused nametable fetch */
+        loopy_t *v = &ppu.vram_addr;
+        ppu.nt_byte = ppu_bus_read(0x2000 | (v->reg & 0x0FFF));
     }
 }
 
@@ -443,7 +448,11 @@ void ppu_tick(void) {
     } else if (ppu.scanline == 241 && ppu.cycle == 1) {
         ppu.registers[PPUSTATUS] |= 0x80;      /* set vblank */
         ppu.nmi_occured = true;
+
+    /* pre-render line */
     } else if (ppu.scanline == 261) {
+        if (MASK_SHOW_SPR || MASK_SHOW_BG) rendering_tick();
+
         if (ppu.cycle == 1) {
             ppu.registers[PPUSTATUS] &= ~0x80; /* clear vblank */
             ppu.nmi_occured = false;
@@ -457,9 +466,9 @@ void ppu_tick(void) {
                 v->bits.nt_select = (v->bits.nt_select & 1) | (t.bits.nt_select & 2);
             }
 
-        } else if (ppu.cycle == 339 && ppu.even_odd_toggle && MASK_SHOW_BG) {
+        } else if (ppu.cycle == 340 && ppu.even_odd_toggle && MASK_SHOW_BG) {
             /* skip cycle 0 idle on odd ticks when bg enabled */
-            ppu.cycle = 0;
+            ppu.cycle = 1;
             ppu.scanline = 0;
             ppu.frame_completed = true;
             ppu.even_odd_toggle = !ppu.even_odd_toggle;
