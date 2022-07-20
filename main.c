@@ -44,7 +44,7 @@ int main(int argc, char **argv) {
     io_init();
 
     /* LEAK: disassemble allocates memory for strings */
-    dasm_map_t *dasm = disassemble(0x8000, 0xFFFF);
+    /*dasm_map_t *dasm = disassemble(0x8000, 0xFFFF);*/
 
     /* LEAK: 
      * All of the malloc calls for sprite pixels are leaking. since the memory

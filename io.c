@@ -149,14 +149,14 @@ void do_input() {
                         (platform_state.controller_states[0] & ~CONTROLLER_START) | mask;
                     break;
                 } 
-                case SDL_SCANCODE_A:
+                case SDL_SCANCODE_X:
                 {
                     uint8_t mask = event.type == SDL_KEYDOWN ? CONTROLLER_A : 0;
                     platform_state.controller_states[0] = 
                         (platform_state.controller_states[0] & ~CONTROLLER_A) | mask;
                     break;
                 } 
-                case SDL_SCANCODE_B:
+                case SDL_SCANCODE_C:
                 {
                     uint8_t mask = event.type == SDL_KEYDOWN ? CONTROLLER_B : 0;
                     platform_state.controller_states[0] = 

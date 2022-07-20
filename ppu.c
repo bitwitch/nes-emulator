@@ -1,6 +1,7 @@
 #include <assert.h>
 #include <stdbool.h>
 #include <stdlib.h> /* for rand */
+#include <string.h> /* for memset */
 #include "ppu.h"
 #include "io.h"
 #include "cart.h"
@@ -39,6 +40,20 @@ typedef union {
     } bits;
 } loopy_t;
 
+/*
+ *  OAM entry attributes:
+ *  76543210
+ *  ||||||||
+ *  ||||||++- Palette (4 to 7) of sprite
+ *  |||+++--- Unimplemented (read 0)
+ *  ||+------ Priority (0: in front of background; 1: behind background)
+ *  |+------- Flip sprite horizontally
+ *  +-------- Flip sprite vertically
+ */
+typedef struct {
+    uint8_t y, tile_id, attr, x;
+} oam_entry_t;
+
 typedef struct {
     uint8_t vram[2048];
     uint8_t palette_ram[32];
@@ -51,8 +66,11 @@ typedef struct {
     /* byte 2: attributes */
     /* byte 3: x position (left) */
     uint8_t oam[256];
+    oam_entry_t oam2[8]; /* sprites on a single scanline */
     uint8_t oam_addr;
-    /*uint8_t oam_dma;*/
+    bool sprite_overflow;
+    uint8_t spr_shifter_pat_lo[8];
+    uint8_t spr_shifter_pat_hi[8];
 
     uint32_t colors[64];
     uint32_t *screen_pixels;
@@ -228,6 +246,54 @@ void update_pattern_tables(int selected_palette, sprite_t pattern_tables[2]) {
     }
 }
 
+/* evaluate up to 8 sprites for the next scanline */
+void ppu_evaluate_sprites(void) {
+    /* TODO(shaw): secondary OAM clear and sprite evaluation do not occur on
+     * the pre-render scanline 261, but sprite tile fetches still do */
+
+    int i, scan_y;
+    oam_entry_t *sprite;
+    int count = 0;
+    int sprite_height = CTRL_EIGHT_BY_SIXTEEN ? 16 : 8;
+
+    /* initialize secondary OAM */
+    memset(ppu.oam2, 0xFF, 8*sizeof(oam_entry_t));
+
+    /* NOTE(shaw): does this get reset per scanline?? probably */
+    ppu.sprite_overflow = false;
+
+    for (i=0; i<64; i+=4) {
+        sprite = (oam_entry_t*)(ppu.oam+i);
+        scan_y = ppu.scanline + 1 - sprite->y;
+        if (count < 9 && scan_y >= 0 && scan_y < sprite_height) {
+            if (count == 8) {
+                ppu.sprite_overflow = true;
+                break;
+            }
+
+            /* get sprite pattern */
+
+            /*TODO(shaw): handle 8x16 mode and vertical flip */
+            
+            uint8_t sprite_addr_lo = 
+                (CTRL_SPRITE_TABLE << 12) |
+                sprite->tile_id * 16           |
+                scan_y;
+                    
+            uint8_t sprite_data_lo = ppu_bus_read(sprite_addr_lo);
+            uint8_t sprite_data_hi = ppu_bus_read(sprite_addr_lo+8);
+
+            /*TODO(shaw): handle horizontal flip */
+
+            ppu.spr_shifter_pat_lo[count] = sprite_data_lo;
+            ppu.spr_shifter_pat_hi[count] = sprite_data_hi;
+
+            /* add sprite to secondary OAM */
+            memcpy(ppu.oam+i, ppu.oam2+count, sizeof(ppu.oam2[0]));
+            ++count;
+        }
+    }
+}
 
 uint8_t ppu_read(uint16_t addr) {
     assert(addr <= 7);
@@ -335,8 +401,24 @@ void ppu_write(uint16_t addr, uint8_t data) {
 void rendering_tick(void) {
     if (ppu.cycle > 0 && (ppu.cycle < 256 || ppu.cycle > 320) && ppu.cycle < 337) {
 
-        ppu.bg_shifter_pat_lo <<= 1; ppu.bg_shifter_pat_hi <<= 1;
-        ppu.bg_shifter_attr_lo <<= 1; ppu.bg_shifter_attr_hi <<= 1;
+        /* TODO(shaw): figure out if anything else should only occur if show bg is set */
+        if (MASK_SHOW_BG) {
+            ppu.bg_shifter_pat_lo <<= 1; ppu.bg_shifter_pat_hi <<= 1;
+            ppu.bg_shifter_attr_lo <<= 1; ppu.bg_shifter_attr_hi <<= 1;
+        }
+
+        if (MASK_SHOW_SPR && ppu.cycle < 256) {
+            oam_entry_t *sprite;
+            for (int i=0; i<8; ++i) {
+                sprite = ppu.oam2+i;
+                if (sprite->x > 0) {
+                    --sprite->x;
+                } else {
+                    ppu.spr_shifter_pat_lo[i] <<= 1;
+                    ppu.spr_shifter_pat_hi[i] <<= 1;
+                }
+            }
+        }
 
         loopy_t *v = &ppu.vram_addr;
         switch ((ppu.cycle - 1) % 8) {
@@ -417,6 +499,8 @@ void rendering_tick(void) {
         v->bits.coarse_x = t.bits.coarse_x;
         v->bits.nt_select = (v->bits.nt_select & 2) | (t.bits.nt_select & 1);
 
+        ppu_evaluate_sprites();
+
     } else if (ppu.cycle == 337 || ppu.cycle == 339) {
         /* unused nametable fetch */
         loopy_t *v = &ppu.vram_addr;
@@ -433,20 +517,56 @@ void rendering_tick(void) {
  *  +----- Background/Sprite select
  */
 void render_pixel(void) {
-    uint8_t bitnum = 15 - ppu.fine_x;
+    uint8_t bg_pal_index = 0;
+    uint8_t bg_pal_num = 0;
+    if (MASK_SHOW_BG) {
+        uint8_t bitnum = 15 - ppu.fine_x;
 
-    uint8_t pal_index = 
-        ((ppu.bg_shifter_pat_lo >> bitnum) & 1) |
-        (((ppu.bg_shifter_pat_hi >> bitnum) & 1) << 1);
+        bg_pal_index = 
+            ((ppu.bg_shifter_pat_lo >> bitnum) & 1) |
+            (((ppu.bg_shifter_pat_hi >> bitnum) & 1) << 1);
 
-    /*TODO(shaw): bg or sprite select */
+        bg_pal_num = 
+            ((ppu.bg_shifter_attr_lo >> bitnum) & 1) |
+            (((ppu.bg_shifter_attr_hi >> bitnum) & 1) << 1);
+    }
 
-    uint8_t pal_num = 
-        ((ppu.bg_shifter_attr_lo >> bitnum) & 1) |
-        (((ppu.bg_shifter_attr_hi >> bitnum) & 1) << 1);
+    uint8_t fg_pal_index = 0;
+    uint8_t fg_pal_num   = 0;
+    uint8_t fg_priority  = 0;
+    if (MASK_SHOW_SPR) {
+        oam_entry_t *sprite;
+        for (int i=0; i<8; ++i) {
+            sprite = ppu.oam2+i;
+            
+            uint8_t lo = (ppu.spr_shifter_pat_lo[i] >> 7) & 1;
+            uint8_t hi = (ppu.spr_shifter_pat_hi[i] >> 7) & 1;
+            fg_pal_index = (hi << 1) | lo;
+            fg_pal_num = (sprite->attr & 0x3) + 4;
+            fg_priority = (sprite->attr >> 5) & 1;
 
-    uint32_t color = get_color_from_palette(pal_num, pal_index);
-    ppu.screen_pixels[ppu.scanline * NES_WIDTH + ppu.cycle] = color;
+            if (fg_pal_index != 0)
+                break;
+        }
+    }
+
+    uint8_t pal_index = 0;
+    uint8_t pal_num = 0;
+
+    if (fg_pal_index > 0 && (fg_priority || bg_pal_index == 0)) {
+        pal_index = fg_pal_index;
+        pal_num = fg_pal_num;
+    } else {
+        pal_index = bg_pal_index;
+        pal_num = bg_pal_num;
+    }
+
+    /* TEMP OVERRIDE */
+    pal_index = bg_pal_index;
+    pal_num = bg_pal_num;
+
+    uint32_t pixel = get_color_from_palette(pal_num, pal_index);
+    ppu.screen_pixels[ppu.scanline * NES_WIDTH + ppu.cycle] = pixel;
 }
 
 void ppu_tick(void) {
@@ -464,6 +584,8 @@ void ppu_tick(void) {
         if (ppu.cycle == 1) {
             ppu.registers[PPUSTATUS] &= ~0x80; /* clear vblank */
             ppu.nmi_occured = false;
+            memset(ppu.spr_shifter_pat_lo, 0, 8*sizeof(ppu.spr_shifter_pat_lo[0]));
+            memset(ppu.spr_shifter_pat_hi, 0, 8*sizeof(ppu.spr_shifter_pat_lo[0]));
 
         } else if (ppu.cycle > 279 && ppu.cycle < 305) {
             if (MASK_SHOW_SPR || MASK_SHOW_BG) {
