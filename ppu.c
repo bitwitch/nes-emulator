@@ -69,6 +69,7 @@ typedef struct {
     oam_entry_t oam2[8]; /* sprites on a single scanline */
     uint8_t oam_addr;
     bool sprite_overflow;
+    uint8_t sprite_count_scanline;
     uint8_t spr_shifter_pat_lo[8];
     uint8_t spr_shifter_pat_hi[8];
 
@@ -250,23 +251,25 @@ void update_pattern_tables(int selected_palette, sprite_t pattern_tables[2]) {
 void ppu_evaluate_sprites(void) {
     /* TODO(shaw): secondary OAM clear and sprite evaluation do not occur on
      * the pre-render scanline 261, but sprite tile fetches still do */
+    if (ppu.scanline == 261) return;
 
     int i, scan_y;
     oam_entry_t *sprite;
-    int count = 0;
-    int sprite_height = CTRL_EIGHT_BY_SIXTEEN ? 16 : 8;
+    /*int sprite_height = CTRL_EIGHT_BY_SIXTEEN ? 16 : 8;*/
+    int sprite_height = 8;
 
     /* initialize secondary OAM */
     memset(ppu.oam2, 0xFF, 8*sizeof(oam_entry_t));
+    ppu.sprite_count_scanline = 0;
 
     /* NOTE(shaw): does this get reset per scanline?? probably */
     ppu.sprite_overflow = false;
 
     for (i=0; i<64; i+=4) {
         sprite = (oam_entry_t*)(ppu.oam+i);
-        scan_y = ppu.scanline + 1 - sprite->y;
-        if (count < 9 && scan_y >= 0 && scan_y < sprite_height) {
-            if (count == 8) {
+        scan_y = ppu.scanline+1 - sprite->y;
+        if (ppu.sprite_count_scanline < 9 && scan_y >= 0 && scan_y < sprite_height) {
+            if (ppu.sprite_count_scanline == 8) {
                 ppu.sprite_overflow = true;
                 break;
             }
@@ -274,23 +277,23 @@ void ppu_evaluate_sprites(void) {
             /* get sprite pattern */
 
             /*TODO(shaw): handle 8x16 mode and vertical flip */
-            
-            uint8_t sprite_addr_lo = 
-                (CTRL_SPRITE_TABLE << 12) |
-                sprite->tile_id * 16           |
-                scan_y;
+
+            uint16_t sprite_addr_lo = 
+                (CTRL_SPRITE_TABLE << 12) | /* which pattern table */
+                sprite->tile_id * 16      | /* index into that pattern table */
+                scan_y;                     /* index to that tile */
                     
             uint8_t sprite_data_lo = ppu_bus_read(sprite_addr_lo);
             uint8_t sprite_data_hi = ppu_bus_read(sprite_addr_lo+8);
 
             /*TODO(shaw): handle horizontal flip */
 
-            ppu.spr_shifter_pat_lo[count] = sprite_data_lo;
-            ppu.spr_shifter_pat_hi[count] = sprite_data_hi;
+            ppu.spr_shifter_pat_lo[ppu.sprite_count_scanline] = sprite_data_lo;
+            ppu.spr_shifter_pat_hi[ppu.sprite_count_scanline] = sprite_data_hi;
 
             /* add sprite to secondary OAM */
-            memcpy(ppu.oam+i, ppu.oam2+count, sizeof(ppu.oam2[0]));
-            ++count;
+            memcpy(ppu.oam2+ppu.sprite_count_scanline, ppu.oam+i, sizeof(ppu.oam2[0]));
+            ++ppu.sprite_count_scanline;
         }
     }
 }
@@ -409,7 +412,7 @@ void rendering_tick(void) {
 
         if (MASK_SHOW_SPR && ppu.cycle < 256) {
             oam_entry_t *sprite;
-            for (int i=0; i<8; ++i) {
+            for (int i=0; i<ppu.sprite_count_scanline; ++i) {
                 sprite = ppu.oam2+i;
                 if (sprite->x > 0) {
                     --sprite->x;
@@ -534,16 +537,18 @@ void render_pixel(void) {
     uint8_t fg_pal_index = 0;
     uint8_t fg_pal_num   = 0;
     uint8_t fg_priority  = 0;
-    if (MASK_SHOW_SPR) {
+    if (MASK_SHOW_SPR) { 
         oam_entry_t *sprite;
-        for (int i=0; i<8; ++i) {
+        for (int i=0; i<ppu.sprite_count_scanline; ++i) {
             sprite = ppu.oam2+i;
             
-            uint8_t lo = (ppu.spr_shifter_pat_lo[i] >> 7) & 1;
-            uint8_t hi = (ppu.spr_shifter_pat_hi[i] >> 7) & 1;
-            fg_pal_index = (hi << 1) | lo;
-            fg_pal_num = (sprite->attr & 0x3) + 4;
-            fg_priority = (sprite->attr >> 5) & 1;
+            if (sprite->x == 0) {
+                uint8_t lo = (ppu.spr_shifter_pat_lo[i] >> 7) & 1;
+                uint8_t hi = (ppu.spr_shifter_pat_hi[i] >> 7) & 1;
+                fg_pal_index = (hi << 1) | lo;
+                fg_pal_num = (sprite->attr & 0x3) + 4;
+                fg_priority = (sprite->attr >> 5) & 1;
+            }
 
             if (fg_pal_index != 0)
                 break;
@@ -562,8 +567,8 @@ void render_pixel(void) {
     }
 
     /* TEMP OVERRIDE */
-    pal_index = bg_pal_index;
-    pal_num = bg_pal_num;
+    /*pal_index = bg_pal_index;*/
+    /*pal_num = bg_pal_num;*/
 
     uint32_t pixel = get_color_from_palette(pal_num, pal_index);
     ppu.screen_pixels[ppu.scanline * NES_WIDTH + ppu.cycle] = pixel;

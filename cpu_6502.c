@@ -17,7 +17,6 @@ typedef union {
 #endif
 } word_t;
 
-
 /****************************************************************************/
 /* interrupts */
 /****************************************************************************/
@@ -1160,7 +1159,6 @@ void print_cpu_state(cpu_t *cpu) {
         (cpu->status >> 0) & 1);
 }
 
-
 void cpu_tick(cpu_t *cpu) {
     if (cpu->op_cycles == 0) {
         cpu->opcode = bus_read(cpu->pc++);
@@ -1175,7 +1173,11 @@ void cpu_tick(cpu_t *cpu) {
         uint8_t am_add_cycle = op.addr_mode(cpu, &addr);
         uint8_t op_add_cycle = op.execute(cpu, addr);
 
+        /* TODO(shaw): implement cpu suspending during dma
+         * 512 cycles (+1 on odd cpu cycles) */
+
         cpu->op_cycles += (am_add_cycle & op_add_cycle);
+
     }
     --cpu->op_cycles;
     ++cpu->cycles;
