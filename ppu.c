@@ -265,7 +265,7 @@ void ppu_evaluate_sprites(void) {
     /* NOTE(shaw): does this get reset per scanline?? probably */
     ppu.sprite_overflow = false;
 
-    for (i=0; i<64; i+=4) {
+    for (i=0; i<256; i+=4) {
         sprite = (oam_entry_t*)(ppu.oam+i);
         scan_y = ppu.scanline+1 - sprite->y;
         if (ppu.sprite_count_scanline < 9 && scan_y >= 0 && scan_y < sprite_height) {
@@ -280,8 +280,8 @@ void ppu_evaluate_sprites(void) {
 
             uint16_t sprite_addr_lo = 
                 (CTRL_SPRITE_TABLE << 12) | /* which pattern table */
-                sprite->tile_id * 16      | /* index into that pattern table */
-                scan_y;                     /* index to that tile */
+                sprite->tile_id * 16      | /* offset into that pattern table */
+                scan_y;                     /* offset into that tile */
                     
             uint8_t sprite_data_lo = ppu_bus_read(sprite_addr_lo);
             uint8_t sprite_data_hi = ppu_bus_read(sprite_addr_lo+8);
