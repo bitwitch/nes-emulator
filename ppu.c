@@ -50,6 +50,10 @@ typedef union {
  *  |+------- Flip sprite horizontally
  *  +-------- Flip sprite vertically
  */
+#define SPR_ATTR_PRIORITY       (1 << 5)
+#define SPR_ATTR_FLIP_HORIZ     (1 << 6)
+#define SPR_ATTR_FLIP_VERT      (1 << 7)
+
 typedef struct {
     uint8_t y, tile_id, attr, x;
 } oam_entry_t;
@@ -102,6 +106,7 @@ enum {
    PPUADDR,             /* $2006 */
    PPUDATA              /* $2007 */
 };
+
 
 static ppu_t ppu = { 
     /* palette generated from http://drag.wootest.net/misc/palgen.html
@@ -171,6 +176,22 @@ get_color_from_palette(uint8_t palette_num, uint8_t palette_index) {
     uint8_t index = ppu.palette_ram[addr];
     return ppu.colors[index];
 }
+
+
+static inline uint8_t 
+reverse_byte(uint8_t b) {
+    uint8_t result = 0;
+    result |= (b & 0x80) >> 7;
+    result |= (b & 0x40) >> 5;
+    result |= (b & 0x20) >> 3;
+    result |= (b & 0x10) >> 1;
+    result |= (b & 0x08) << 1;
+    result |= (b & 0x04) << 3;
+    result |= (b & 0x02) << 5;
+    result |= (b & 0x01) << 7;
+    return result;
+}
+
 
 void ppu_init(uint32_t *pixels) {
     ppu.screen_pixels = pixels;
@@ -286,7 +307,11 @@ void ppu_evaluate_sprites(void) {
             uint8_t sprite_data_lo = ppu_bus_read(sprite_addr_lo);
             uint8_t sprite_data_hi = ppu_bus_read(sprite_addr_lo+8);
 
-            /*TODO(shaw): handle horizontal flip */
+            /* horizontal flip */
+            if (sprite->attr & SPR_ATTR_FLIP_HORIZ) {
+                sprite_data_lo = reverse_byte(sprite_data_lo);
+                sprite_data_hi = reverse_byte(sprite_data_hi);
+            }
 
             ppu.spr_shifter_pat_lo[ppu.sprite_count_scanline] = sprite_data_lo;
             ppu.spr_shifter_pat_hi[ppu.sprite_count_scanline] = sprite_data_hi;
