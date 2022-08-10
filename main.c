@@ -44,7 +44,7 @@ int main(int argc, char **argv) {
     io_init();
 
     /* LEAK: disassemble allocates memory for strings */
-    /*dasm_map_t *dasm = disassemble(0x8000, 0xFFFF);*/
+    dasm_map_t *dasm = disassemble(0x8000, 0xFFFF);
 
     /* LEAK: 
      * All of the malloc calls for sprite pixels are leaking. since the memory
@@ -128,8 +128,8 @@ int main(int argc, char **argv) {
                 prepare_drawing();
                 render_sprites();
                 render_cpu_state(&cpu, cpu_state_lines);
-                /*render_code(cpu.pc, dasm);*/
-                render_oam_info();
+                render_code(cpu.pc, dasm);
+                /*render_oam_info();*/
                 draw();
 
                 frame_prepared = false;
@@ -169,8 +169,8 @@ int main(int argc, char **argv) {
                 prepare_drawing();
                 render_sprites();
                 render_cpu_state(&cpu, cpu_state_lines);
-                /*render_code(cpu.pc, dasm);*/
-                render_oam_info();
+                render_code(cpu.pc, dasm);
+                /*render_oam_info();*/
                 draw();
                 last_frame_time += MS_PER_FRAME;
                 /* NOTE(shaw): since get_ticks is a uint64_t and only has
@@ -207,8 +207,8 @@ int main(int argc, char **argv) {
                 prepare_drawing();
                 render_sprites();
                 render_cpu_state(&cpu, cpu_state_lines);
-                /*render_code(cpu.pc, dasm);*/
-                render_oam_info();
+                render_code(cpu.pc, dasm);
+                /*render_oam_info();*/
                 draw();
 
                 frame_prepared = false;
