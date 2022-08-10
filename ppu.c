@@ -583,7 +583,7 @@ void render_pixel(void) {
     uint8_t pal_index = 0;
     uint8_t pal_num = 0;
 
-    if (fg_pal_index > 0 && (fg_priority || bg_pal_index == 0)) {
+    if (fg_pal_index > 0 && (fg_priority == 0 || bg_pal_index == 0)) {
         pal_index = fg_pal_index;
         pal_num = fg_pal_num;
     } else {
