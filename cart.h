@@ -6,7 +6,9 @@
 void read_rom_file(char *filepath);
 void delete_cart();
 
-uint8_t cart_read(uint16_t addr);
-void cart_write(uint16_t addr, uint8_t data);
+uint8_t cart_cpu_read(uint16_t addr);
+void cart_cpu_write(uint16_t addr, uint8_t data);
+uint8_t cart_ppu_read(uint16_t addr, uint8_t vram[2048]);
+void cart_ppu_write(uint16_t addr, uint8_t data, uint8_t vram[2048]);
 
 #endif

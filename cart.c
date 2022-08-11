@@ -27,12 +27,15 @@
 #include <string.h>
 #include <errno.h>
 #include "cart.h"
+#include "mappers.h"
 
+/* TODO(shaw): store size of rom arrays and do some assert bounds checking on array accesses */
 typedef struct {
     uint8_t header[16];
     uint8_t *prg_ram;
     uint8_t *prg_rom;
     uint8_t *chr_rom;
+    mapper_t *mapper;
 } cart_t;
 
 #define PRG_ROM_BANKS(header) (header[4])
@@ -40,7 +43,7 @@ typedef struct {
 #define CHR_ROM_BANKS(header) (header[5])
 #define CHR_ROM_SIZE(header)  ((uint32_t)header[5]<<13)
 #define CONTROL_BYTE(header)  (header[6])
-#define MIRROR(header)        (header[6]&0x01)
+#define MIRROR(header)        (header[6]&0x01) /* 0 == horizontal, 1 == vertical */
 #define BATTERY_RAM(header)   (header[6]&0x02)
 #define TRAINER(header)       (header[6]&0x04)
 #define FOUR_SCREEN(header)   (header[6]&0x08)
@@ -75,7 +78,9 @@ void read_rom_file(char *filepath) {
     /* TODO(shaw): this will probably depend on mapper */
     cart.prg_ram = malloc(8192); 
 
-    printf("%u * 16kB ROM, %u * 8kB VROM, mapper %u, ctrlbyte %02X\n", PRG_ROM_BANKS(cart.header), CHR_ROM_BANKS(cart.header), MAPPER(cart.header), CONTROL_BYTE(cart.header));
+    cart.mapper = make_mapper(MAPPER(cart.header), PRG_ROM_BANKS(cart.header), CHR_ROM_BANKS(cart.header));
+
+    printf("%u * 16kB ROM, %u * 8kB VROM, mapper %u, %s mirroring\n", PRG_ROM_BANKS(cart.header), CHR_ROM_BANKS(cart.header), MAPPER(cart.header), MIRROR(cart.header) ? "vertical" : "horizontal");
 
     /* ignore trainer for now */
     /* TODO(shaw): implement trainer ?? */
@@ -113,34 +118,57 @@ void delete_cart() {
     memset(&cart, 0, sizeof(cart_t));
 }
 
-uint8_t cart_read(uint16_t addr) {
-    /* TODO(shaw): implement this correctly based on each mapper */
-    if (addr < 0x2000) 
-        return cart.chr_rom[addr];
+uint8_t cart_cpu_read(uint16_t addr) {
+    uint16_t mapped_addr = mapper_read(cart.mapper, addr);
+
+    if (addr < 0x4020) 
+        assert(0 && "cpu should only access cartridge from 0x4020-0xFFFF");
     else if (addr < 0x6000) 
         assert(0 && "this part of cart memory not implemented");
     else if (addr < 0x8000) /* $6000 - $7FFF */
-        return cart.prg_ram[addr - 0x6000];
-    else if (addr < 0xC000) /* $8000 - $BFFF */
-        return cart.prg_rom[addr - 0x8000];
-    else                    /* $C000 - $FFFF */
-        return cart.prg_rom[addr - 0xC000];
+        return cart.prg_ram[mapped_addr];
+    else {
+        /*printf("addr=0x%4X mapped_addr=0x%4X\n", addr, mapped_addr);*/
+        return cart.prg_rom[mapped_addr];
+    }
+
 }
 
-void cart_write(uint16_t addr, uint8_t data) {
-    /* TODO(shaw): implement this correctly based on each mapper */
+void cart_cpu_write(uint16_t addr, uint8_t data) {
+    uint16_t mapped_addr = mapper_write(cart.mapper, addr, data);
 
-    if (addr < 0x2000) 
-        cart.chr_rom[addr] = data;
+    if (addr < 0x4020) 
+        assert(0 && "cpu should only access cartridge from 0x4020-0xFFFF");
     else if (addr < 0x6000)
         assert(0 && "this part of cart memory not implemented");
-    else if (addr < 0x8000)
-        cart.prg_ram[addr - 0x6000] = data;
-    else if (addr < 0xC000)
-        cart.prg_rom[addr - 0x8000] = data;
-    else 
-        cart.prg_rom[addr - 0xC000] = data;
+    else if (addr < 0x8000) /* $6000 - $7FFF */
+        cart.prg_ram[mapped_addr] = data;
 
+
+    /*if (addr < 0x2000) */
+        /*cart.chr_rom[addr] = data;*/
+    /*else if (addr < 0x6000)*/
+        /*assert(0 && "this part of cart memory not implemented");*/
+    /*else if (addr < 0x8000)*/
+        /*cart.prg_ram[addr - 0x6000] = data;*/
+
+}
+
+
+uint8_t cart_ppu_read(uint16_t addr, uint8_t vram[2048]) {
+    uint16_t mapped_addr = mapper_read(cart.mapper, addr);
+    return addr < 0x2000
+        ? cart.chr_rom[mapped_addr]
+        : vram[mapped_addr];
+
+}
+
+void cart_ppu_write(uint16_t addr, uint8_t data, uint8_t vram[2048]) {
+    uint16_t mapped_addr = mapper_write(cart.mapper, addr, data);
+    if (addr < 0x2000)
+        cart.chr_rom[mapped_addr] = data;
+    else 
+        vram[mapped_addr] = data;
 }
 
 
