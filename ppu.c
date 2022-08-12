@@ -455,7 +455,7 @@ void rendering_tick(void) {
     if (ppu.cycle > 0 && (ppu.cycle < 256 || ppu.cycle > 320) && ppu.cycle < 337) {
 
         /* TODO(shaw): figure out if anything else should only occur if show bg is set */
-        if (MASK_SHOW_BG) {
+        if (MASK_SHOW_BG && ppu.cycle < 256) {
             ppu.bg_shifter_pat_lo <<= 1; ppu.bg_shifter_pat_hi <<= 1;
             ppu.bg_shifter_attr_lo <<= 1; ppu.bg_shifter_attr_hi <<= 1;
         }
