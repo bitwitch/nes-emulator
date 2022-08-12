@@ -452,14 +452,15 @@ void ppu_write(uint16_t addr, uint8_t data) {
  *  +--------------- 0: Pattern table is at $0000-$1FFF
  */
 void rendering_tick(void) {
-    if (ppu.cycle > 0 && (ppu.cycle < 256 || ppu.cycle > 320) && ppu.cycle < 337) {
-
-        /* TODO(shaw): figure out if anything else should only occur if show bg is set */
-        if (MASK_SHOW_BG && ppu.cycle < 256) {
+    /* load low 8 bits of bg shift registers */
+    if ((ppu.cycle > 1 && ppu.cycle < 258) || (ppu.cycle > 321 && ppu.cycle < 338)) {
+        if (MASK_SHOW_BG) {
             ppu.bg_shifter_pat_lo <<= 1; ppu.bg_shifter_pat_hi <<= 1;
             ppu.bg_shifter_attr_lo <<= 1; ppu.bg_shifter_attr_hi <<= 1;
         }
+    }
 
+    if (ppu.cycle > 0 && (ppu.cycle < 256 || ppu.cycle > 320) && ppu.cycle < 337) {
         if (MASK_SHOW_SPR && ppu.cycle < 256) {
             oam_entry_t *sprite;
             for (int i=0; i<ppu.sprite_count_scanline; ++i) {
