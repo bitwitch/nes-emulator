@@ -48,7 +48,7 @@ uint8_t bus_read(uint16_t addr) {
         }
     } 
     else 
-        return cart_read(addr);
+        return cart_cpu_read(addr);
     return 0;
 }
 
@@ -86,7 +86,7 @@ void bus_write(uint16_t addr, uint8_t data) {
         }
     } 
     else 
-        cart_write(addr, data);
+        cart_cpu_write(addr, data);
 }
 
 void system_reset(cpu_t *cpu) {
