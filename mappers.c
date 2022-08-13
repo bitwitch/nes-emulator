@@ -54,7 +54,7 @@ mapper0_write(mapper_t *head, uint16_t addr, uint8_t data) {
     return mapper0_map_addr(head, addr);
 }
 
-mapper_t *make_mapper(uint16_t mapper_id, uint8_t prg_banks, uint8_t chr_banks) {
+mapper_t *make_mapper(uint16_t mapper_id, uint8_t prg_banks, uint8_t chr_banks, uint8_t mirroring) {
     mapper_t *mapper;
 
     switch(mapper_id) {
@@ -72,6 +72,7 @@ mapper_t *make_mapper(uint16_t mapper_id, uint8_t prg_banks, uint8_t chr_banks) 
 
     mapper->prg_banks = prg_banks;
     mapper->chr_banks = chr_banks;
+    mapper->mirroring = mirroring;
     mapper->id = mapper_id;
 
     return mapper;

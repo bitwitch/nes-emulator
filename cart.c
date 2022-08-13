@@ -78,7 +78,11 @@ void read_rom_file(char *filepath) {
     /* TODO(shaw): this will probably depend on mapper */
     cart.prg_ram = malloc(8192); 
 
-    cart.mapper = make_mapper(MAPPER(cart.header), PRG_ROM_BANKS(cart.header), CHR_ROM_BANKS(cart.header));
+    cart.mapper = make_mapper(
+        MAPPER(cart.header), 
+        PRG_ROM_BANKS(cart.header), 
+        CHR_ROM_BANKS(cart.header),
+        MIRROR(cart.header));
 
     printf("%u * 16kB ROM, %u * 8kB VROM, mapper %u, %s mirroring\n", PRG_ROM_BANKS(cart.header), CHR_ROM_BANKS(cart.header), MAPPER(cart.header), MIRROR(cart.header) ? "vertical" : "horizontal");
 

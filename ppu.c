@@ -144,21 +144,6 @@ ppu_bus_read(uint16_t addr) {
         data = ppu.palette_ram[addr];
     }
 
-
-    /*if (addr < 0x2000) {*/
-        /*data = cart_read(addr);*/
-    /*} else if (addr < 0x3F00) {*/
-        /* TODO(shaw): do this with mappers 
-         * right now, just hardcoding vertical mirroring */
-        /*addr = (addr - 0x2000) & 0x07FF;*/
-        /*data = ppu.vram[addr];*/
-    /*} else {*/
-        /*addr = (addr - 0x3F00) & 0x1F;*/
-        /*if (addr % 4 == 0) addr = 0;*/
-        /*data = ppu.palette_ram[addr];*/
-    /*}*/
-
-
     return data;
 }
 
@@ -175,22 +160,6 @@ ppu_bus_write(uint16_t addr, uint8_t data) {
             addr -= 0x10;
         ppu.palette_ram[addr] = data;
     }
-
-    /*if (addr < 0x2000) {*/
-        /*cart_write(addr, data);*/
-    /*} else if (addr < 0x3F00) {*/
-        /* TODO(shaw): do this with mappers 
-         * right now, just hardcoding vertical mirroring */
-        /*addr = (addr - 0x2000) & 0x07FF;*/
-        /*ppu.vram[addr] = data;*/
-    /*} else {*/
-        /*addr = (addr - 0x3F00) & 0x1F;*/
-        /*[> Addresses $3F04/$3F08/$3F0C can contain unique data <]*/
-        /*[> Addresses $3F10/$3F14/$3F18/$3F1C are mirrors of $3F00/$3F04/$3F08/$3F0C <]*/
-        /*if (addr > 0x0F && addr % 4 == 0)*/
-            /*addr -= 0x10;*/
-        /*ppu.palette_ram[addr] = data;*/
-    /*}*/
 }
 
 static uint32_t
