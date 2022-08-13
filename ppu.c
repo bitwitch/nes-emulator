@@ -268,7 +268,7 @@ void ppu_evaluate_sprites(void) {
      * the pre-render scanline 261, but sprite tile fetches still do */
     if (ppu.scanline == 261) return;
 
-    int i, scan_y;
+    int i, sprite_row;
     oam_entry_t *sprite;
     /*int sprite_height = CTRL_EIGHT_BY_SIXTEEN ? 16 : 8;*/
     int sprite_height = 8;
@@ -282,8 +282,8 @@ void ppu_evaluate_sprites(void) {
 
     for (i=0; i<256; i+=4) {
         sprite = (oam_entry_t*)(ppu.oam+i);
-        scan_y = ppu.scanline+1 - sprite->y;
-        if (ppu.sprite_count_scanline < 9 && scan_y >= 0 && scan_y < sprite_height) {
+        sprite_row = ppu.scanline+1 - sprite->y;
+        if (ppu.sprite_count_scanline < 9 && sprite_row >= 0 && sprite_row < sprite_height) {
             if (ppu.sprite_count_scanline == 8) {
                 ppu.sprite_overflow = true;
                 break;
@@ -291,12 +291,17 @@ void ppu_evaluate_sprites(void) {
 
             /* get sprite pattern */
 
-            /*TODO(shaw): handle 8x16 mode and vertical flip */
+            /*TODO(shaw): handle 8x16 mode */
+
+            /* vertical flip */
+            if (sprite->attr & SPR_ATTR_FLIP_VERT) {
+                sprite_row = sprite_height-1 - sprite_row;
+            }
 
             uint16_t sprite_addr_lo = 
                 (CTRL_SPRITE_TABLE << 12) | /* which pattern table */
                 sprite->tile_id * 16      | /* offset into that pattern table */
-                scan_y;                     /* offset into that tile */
+                sprite_row;                     /* offset into that tile */
                     
             uint8_t sprite_data_lo = ppu_bus_read(sprite_addr_lo);
             uint8_t sprite_data_hi = ppu_bus_read(sprite_addr_lo+8);
