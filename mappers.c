@@ -58,6 +58,8 @@ mapper_t *make_mapper(uint16_t mapper_id, uint8_t prg_banks, uint8_t chr_banks, 
     mapper_t *mapper;
 
     switch(mapper_id) {
+        /* TODO(shaw): remove this case 1, just for running the sprite_zero_hit test rom */
+        case 1:
         case 0:
         {
             mapper0_t *mapper0 = malloc(sizeof(mapper0_t));
@@ -81,6 +83,7 @@ mapper_t *make_mapper(uint16_t mapper_id, uint8_t prg_banks, uint8_t chr_banks, 
 
 uint16_t mapper_read(mapper_t *mapper, uint16_t addr) {
     switch (mapper->id) {
+        case 1:
         case 0: return mapper0_read(mapper, addr);
         default:
             fprintf(stderr, "Unsupported mapper %d\n", mapper->id);
@@ -91,6 +94,7 @@ uint16_t mapper_read(mapper_t *mapper, uint16_t addr) {
 
 uint16_t mapper_write(mapper_t *mapper, uint16_t addr, uint8_t data) {
     switch (mapper->id) {
+        case 1:
         case 0: return mapper0_write(mapper, addr, data);
         default:
             fprintf(stderr, "Unsupported mapper %d\n", mapper->id);
