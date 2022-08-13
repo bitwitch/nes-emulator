@@ -25,10 +25,11 @@ mapper0_map_addr(mapper_t *head, uint16_t addr) {
         uint16_t mapped_addr = (addr & 0x2FFF) - 0x2000;
         if (head->mirroring == MAPPER_MIRROR_VERT)
             return mapped_addr & 0x07FF;
-        else
-            return mapped_addr < 0x0800
-                ? mapped_addr & 0x03FF
-                : mapped_addr & 0x0BFF;
+        else {
+            return (mapped_addr < 0x0800)
+                ? (mapped_addr & 0x03FF)
+                : ((mapped_addr-0x0400) & 0x0BFF) + 0x0400;
+        }
     } 
 
     else if (addr < 0x6000) 
