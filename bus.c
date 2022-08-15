@@ -32,7 +32,7 @@ uint8_t bus_read(uint16_t addr) {
     if (addr < 0x2000)
         return cpu_ram[addr & 0x7FF];
     else if (addr < 0x4000)
-        return ppu_read((addr-0x2000)&0xF);
+        return ppu_read((addr-0x2000)&0x7);
     else if (addr < 0x4020) {
         switch (addr) {
             case 0x4014: break;
@@ -56,7 +56,7 @@ void bus_write(uint16_t addr, uint8_t data) {
     if (addr < 0x2000)
         cpu_ram[addr & 0x7FF] = data;
     else if (addr < 0x4000)
-        ppu_write((addr-0x2000)&0xF, data);
+        ppu_write((addr-0x2000)&0x7, data);
     else if (addr < 0x4020) {
         switch (addr) {
         case 0x4014: 

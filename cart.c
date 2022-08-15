@@ -24,6 +24,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h> 
+#include <stdbool.h> 
 #include <string.h>
 #include <errno.h>
 #include "cart.h"
@@ -53,6 +54,7 @@ typedef struct {
 static cart_t cart;
 
 void read_rom_file(char *filepath) {
+    bool cart_uses_chr_ram = false;
     FILE *fp = fopen(filepath, "rb");
     if (!fp) {
         fprintf(stderr, "Failed to open %s: %s\n", filepath, strerror(errno));
@@ -73,6 +75,12 @@ void read_rom_file(char *filepath) {
 
     uint32_t prg_rom_size = PRG_ROM_SIZE(cart.header);
     uint32_t chr_rom_size = CHR_ROM_SIZE(cart.header);
+
+    if (chr_rom_size == 0) {
+        cart_uses_chr_ram = true;
+        chr_rom_size = 8192; 
+    }
+
     cart.prg_rom = malloc(prg_rom_size);
     cart.chr_rom = malloc(chr_rom_size);
     /* TODO(shaw): this will probably depend on mapper */
@@ -103,7 +111,7 @@ void read_rom_file(char *filepath) {
     }
  
     /* read chr rom */
-    if (fread(cart.chr_rom, 1, chr_rom_size, fp) != chr_rom_size) {
+    if (!cart_uses_chr_ram && fread(cart.chr_rom, 1, chr_rom_size, fp) != chr_rom_size) {
         fprintf(stderr, "Failed to read CHR ROM from %s: %s\n", filepath, strerror(errno));
         exit(1);
     }
@@ -164,7 +172,6 @@ uint8_t cart_ppu_read(uint16_t addr, uint8_t vram[2048]) {
     return addr < 0x2000
         ? cart.chr_rom[mapped_addr]
         : vram[mapped_addr];
-
 }
 
 void cart_ppu_write(uint16_t addr, uint8_t data, uint8_t vram[2048]) {

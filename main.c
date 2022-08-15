@@ -230,7 +230,7 @@ int main(int argc, char **argv) {
     }
 
     /* just let OS clean it up
-     * delete_cart(&cart);
+     * delete_cart();
      */
 
 #ifdef DEBUG_LOG
