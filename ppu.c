@@ -603,21 +603,19 @@ void render_pixel(void) {
 
     }
 
-
     uint8_t pal_index = 0;
     uint8_t pal_num = 0;
 
-    if (fg_pal_index > 0 && (fg_priority == 0 || bg_pal_index == 0)) {
+    if (fg_pal_index == 0 && bg_pal_index == 0) {
+        pal_index = 0;
+        pal_num = 0;
+    } else if (fg_pal_index > 0 && (fg_priority == 0 || bg_pal_index == 0)) {
         pal_index = fg_pal_index;
         pal_num = fg_pal_num;
     } else {
         pal_index = bg_pal_index;
         pal_num = bg_pal_num;
     }
-
-    /* TEMP OVERRIDE */
-    /*pal_index = bg_pal_index;*/
-    /*pal_num = bg_pal_num;*/
 
     uint32_t pixel = get_color_from_palette(pal_num, pal_index);
     ppu.screen_pixels[ppu.scanline * NES_WIDTH + ppu.cycle] = pixel;
