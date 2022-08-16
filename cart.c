@@ -131,11 +131,11 @@ void delete_cart() {
 }
 
 uint8_t cart_cpu_read(uint16_t addr) {
-    uint16_t mapped_addr = mapper_read(cart.mapper, addr);
+    uint32_t mapped_addr = mapper_read(cart.mapper, addr);
 
-    if (addr < 0x4020) 
+    if (addr < 0x4020)
         assert(0 && "cpu should only access cartridge from 0x4020-0xFFFF");
-    else if (addr < 0x6000) 
+    else if (addr < 0x6000)
         assert(0 && "this part of cart memory not implemented");
     else if (addr < 0x8000) /* $6000 - $7FFF */
         return cart.prg_ram[mapped_addr];
@@ -143,11 +143,10 @@ uint8_t cart_cpu_read(uint16_t addr) {
         /*printf("addr=0x%4X mapped_addr=0x%4X\n", addr, mapped_addr);*/
         return cart.prg_rom[mapped_addr];
     }
-
 }
 
 void cart_cpu_write(uint16_t addr, uint8_t data) {
-    uint16_t mapped_addr = mapper_write(cart.mapper, addr, data);
+    uint32_t mapped_addr = mapper_write(cart.mapper, addr, data);
 
     if (addr < 0x4020) 
         assert(0 && "cpu should only access cartridge from 0x4020-0xFFFF");
@@ -163,19 +162,18 @@ void cart_cpu_write(uint16_t addr, uint8_t data) {
         /*assert(0 && "this part of cart memory not implemented");*/
     /*else if (addr < 0x8000)*/
         /*cart.prg_ram[addr - 0x6000] = data;*/
-
 }
 
 
 uint8_t cart_ppu_read(uint16_t addr, uint8_t vram[2048]) {
-    uint16_t mapped_addr = mapper_read(cart.mapper, addr);
+    uint32_t mapped_addr = mapper_read(cart.mapper, addr);
     return addr < 0x2000
         ? cart.chr_rom[mapped_addr]
         : vram[mapped_addr];
 }
 
 void cart_ppu_write(uint16_t addr, uint8_t data, uint8_t vram[2048]) {
-    uint16_t mapped_addr = mapper_write(cart.mapper, addr, data);
+    uint32_t mapped_addr = mapper_write(cart.mapper, addr, data);
     if (addr < 0x2000)
         cart.chr_rom[mapped_addr] = data;
     else 
