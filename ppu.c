@@ -63,7 +63,7 @@ typedef struct {
     uint8_t sprite_count_scanline;
     uint8_t spr_shifter_pat_lo[8];
     uint8_t spr_shifter_pat_hi[8];
-    int sprite_zero_oam2_index;
+    bool sprite_zero_hit_possible;
 
     uint32_t colors[64];
     uint32_t *screen_pixels;
@@ -190,30 +190,20 @@ reverse_byte(uint8_t b) {
 
 
 static void 
-do_sprite_zero_hit(uint8_t bg_pal_index) {
-    if (!STATUS_SPR_ZERO_HIT && ppu.sprite_zero_oam2_index >= 0) {
-        oam_entry_t *sprite = (oam_entry_t *)ppu.oam;
-        if (sprite->x == 0) {
-            int i = ppu.sprite_zero_oam2_index;
-            uint8_t lo = (ppu.spr_shifter_pat_lo[i] >> 7) & 1;
-            uint8_t hi = (ppu.spr_shifter_pat_hi[i] >> 7) & 1;
-            uint8_t sprite_zero_pal_index = (hi << 1) | lo;
-
-            if (sprite_zero_pal_index > 0 && bg_pal_index > 0 &&
-                (ppu.cycle > 7 || (MASK_SHOW_BG_LEFT && MASK_SHOW_SPR_LEFT)) &&
-                ppu.cycle > 1 &&
-                ppu.cycle < 255) 
-            {
-                ppu.registers[PPUSTATUS] |= 0x20; /* set sprite zero hit */
-            }
-        }
+do_sprite_zero_hit(uint8_t fg_pal_index, uint8_t bg_pal_index) {
+    if (ppu.sprite_zero_hit_possible &&
+        fg_pal_index > 0 && bg_pal_index > 0 &&
+        (ppu.cycle > 7 || (MASK_SHOW_BG_LEFT && MASK_SHOW_SPR_LEFT)) &&
+        ppu.cycle > 1 &&
+        ppu.cycle != 255)
+    {
+        ppu.registers[PPUSTATUS] |= 0x40; /* set sprite zero hit */
     }
 }
 
 
 void ppu_init(uint32_t *pixels) {
     ppu.screen_pixels = pixels;
-    ppu.sprite_zero_oam2_index = -1;
     /* initialize with some random colors to visualize palette on load */
     /*for (int i=0; i<32; ++i) {*/
         /*int r = rand();*/
@@ -304,7 +294,7 @@ void ppu_evaluate_sprites(void) {
 
     /* NOTE(shaw): does this get reset per scanline?? probably */
     ppu.sprite_overflow = false;
-    ppu.sprite_zero_oam2_index = -1;
+    ppu.sprite_zero_hit_possible = false;
 
     for (i=0; i<256; i+=4) {
         sprite = (oam_entry_t*)(ppu.oam+i);
@@ -316,7 +306,7 @@ void ppu_evaluate_sprites(void) {
             }
 
             if (i == 0)
-                ppu.sprite_zero_oam2_index = ppu.sprite_count_scanline;
+                ppu.sprite_zero_hit_possible = true;
 
             /* get sprite pattern */
 
@@ -604,12 +594,15 @@ void render_pixel(void) {
                 fg_priority = (sprite->attr >> 5) & 1;
             }
 
+            if (i == 0)
+                do_sprite_zero_hit(fg_pal_index, bg_pal_index);
+
             if (fg_pal_index != 0)
                 break;
         }
 
-        do_sprite_zero_hit(bg_pal_index);
     }
+
 
     uint8_t pal_index = 0;
     uint8_t pal_num = 0;
@@ -644,7 +637,7 @@ void ppu_tick(void) {
 
         if (ppu.cycle == 1) {
             ppu.registers[PPUSTATUS] &= ~0x80; /* clear vblank */
-            ppu.registers[PPUSTATUS] &= ~0x20; /* clear sprite zero hit */
+            ppu.registers[PPUSTATUS] &= ~0x40; /* clear sprite zero hit */
             ppu.nmi_occured = false;
             memset(ppu.spr_shifter_pat_lo, 0, 8*sizeof(ppu.spr_shifter_pat_lo[0]));
             memset(ppu.spr_shifter_pat_hi, 0, 8*sizeof(ppu.spr_shifter_pat_lo[0]));
