@@ -285,8 +285,7 @@ void ppu_evaluate_sprites(void) {
 
     int i, sprite_row;
     oam_entry_t *sprite;
-    /*int sprite_height = CTRL_EIGHT_BY_SIXTEEN ? 16 : 8;*/
-    int sprite_height = 8;
+    int sprite_height = CTRL_EIGHT_BY_SIXTEEN ? 16 : 8;
 
     /* initialize secondary OAM */
     memset(ppu.oam2, 0xFF, 8*sizeof(oam_entry_t));
@@ -308,19 +307,27 @@ void ppu_evaluate_sprites(void) {
             if (i == 0)
                 ppu.sprite_zero_hit_possible = true;
 
-            /* get sprite pattern */
-
-            /*TODO(shaw): handle 8x16 mode */
-
             /* vertical flip */
             if (sprite->attr & SPR_ATTR_FLIP_VERT) {
                 sprite_row = sprite_height-1 - sprite_row;
             }
 
+            /* default to 8x8 mode */
+            uint8_t pattern_table = CTRL_SPRITE_TABLE;
+            uint8_t tile_index = sprite->tile_id;
+
+            /* 8x16 mode */
+            if (sprite_height == 16) {
+                pattern_table = sprite->tile_id & 1;
+                tile_index = sprite->tile_id & 0xFE;
+                if (sprite_row > 7) ++tile_index;
+                sprite_row &= 0X7; /* map the overall row into just the 8x8 subtile */
+            }
+
             uint16_t sprite_addr_lo = 
-                (CTRL_SPRITE_TABLE << 12) | /* which pattern table */
-                sprite->tile_id * 16      | /* offset into that pattern table */
-                sprite_row;                     /* offset into that tile */
+                (pattern_table << 12) |  /* which pattern table */
+                tile_index * 16       |  /* offset into that pattern table */
+                sprite_row;              /* offset into that tile */
                     
             uint8_t sprite_data_lo = ppu_bus_read(sprite_addr_lo);
             uint8_t sprite_data_hi = ppu_bus_read(sprite_addr_lo+8);
