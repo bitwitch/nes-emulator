@@ -297,7 +297,13 @@ void ppu_evaluate_sprites(void) {
 
     for (i=0; i<256; i+=4) {
         sprite = (oam_entry_t*)(ppu.oam+i);
-        sprite_row = ppu.scanline+1 - sprite->y;
+        /* NOTE(shaw): why isn't this scanline + 1 for the next scanline???  if
+         * the current scanline is used it is rendered correctly, but I don't
+         * understand why?  If for example the scanline is 7 and the sprite y
+         * position is 0, then the sprite should not appear on the next
+         * scanline. If current scanline is used though, then it will
+         */
+        sprite_row = ppu.scanline - sprite->y;
         if (ppu.sprite_count_scanline < 9 && sprite_row >= 0 && sprite_row < sprite_height) {
             if (ppu.sprite_count_scanline == 8) {
                 ppu.sprite_overflow = true;
@@ -321,7 +327,7 @@ void ppu_evaluate_sprites(void) {
                 pattern_table = sprite->tile_id & 1;
                 tile_index = sprite->tile_id & 0xFE;
                 if (sprite_row > 7) ++tile_index;
-                sprite_row &= 0X7; /* map the overall row into just the 8x8 subtile */
+                sprite_row &= 0x07; /* map the overall row into just the 8x8 subtile */
             }
 
             uint16_t sprite_addr_lo = 
