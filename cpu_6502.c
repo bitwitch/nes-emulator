@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "cpu_6502.h"
+#include "bus.h"
 #include "stb_ds.h"
 
 #ifdef DEBUG_LOG

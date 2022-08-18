@@ -58,11 +58,4 @@ uint8_t get_flag(cpu_t *cpu, status_mask_t flag);
 void set_flag(cpu_t *cpu, status_mask_t flag, bool value);
 void debug_log_instruction(cpu_t *cpu);
 
-
-/*****************************************************************/
-/* These need to be defined by the system incorporating the 6502 */
-extern uint8_t bus_read(uint16_t addr);
-extern void bus_write(uint16_t addr, uint8_t data);
-/*****************************************************************/
-
 #endif 
