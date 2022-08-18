@@ -12,6 +12,7 @@ static struct {
 
 static SDL_Window *window;
 static SDL_Renderer *renderer;
+static SDL_Joystick *joysticks[2];
 
 #define MAX_SPRITES 16
 static sprite_t *sprites[MAX_SPRITES];
@@ -23,8 +24,9 @@ uint8_t controller_registers[2];
 
 static void generate_font_glyphs(void);
 
+
 void io_init(void) {
-    if (SDL_Init(SDL_INIT_VIDEO) < 0) {
+    if (SDL_Init(SDL_INIT_VIDEO|SDL_INIT_JOYSTICK) < 0) {
         printf("Failed to initialize SDL: %s\n", SDL_GetError());
         exit(1);
     }
@@ -46,10 +48,43 @@ void io_init(void) {
         exit(1);
     }
 
-    
     memset(&platform_state, 0, sizeof(platform_state));
     memset(&last_platform_state, 0, sizeof(last_platform_state));
 
+    /* Joysticks */
+    int num_joysticks = SDL_NumJoysticks();
+
+    if (num_joysticks == 0)
+        printf("No joysticks connected\n");
+
+    if (num_joysticks > 0) {
+        joysticks[0] = SDL_JoystickOpen(0);
+        if (joysticks[0]) {
+            printf("Opened Joystick 0\n");
+            printf("    Name: %s\n", SDL_JoystickNameForIndex(0));
+            printf("    Number of Axes: %d\n", SDL_JoystickNumAxes(joysticks[0]));
+            printf("    Number of Buttons: %d\n", SDL_JoystickNumButtons(joysticks[0]));
+            printf("    Number of Balls: %d\n", SDL_JoystickNumBalls(joysticks[0]));
+        } else {
+            printf("Error: Failed to open Joystick 0\n");
+        }
+    }
+
+    if (num_joysticks > 1) {
+        joysticks[0] = SDL_JoystickOpen(1);
+        if (joysticks[1]) {
+            printf("Opened Joystick 1\n");
+            printf("    Name: %s\n", SDL_JoystickNameForIndex(1));
+            printf("    Number of Axes: %d\n", SDL_JoystickNumAxes(joysticks[1]));
+            printf("    Number of Buttons: %d\n", SDL_JoystickNumButtons(joysticks[1]));
+            printf("    Number of Balls: %d\n", SDL_JoystickNumBalls(joysticks[1]));
+        } else {
+            printf("Error: Failed to open Joystick 1\n");
+        }
+    }
+
+
+    /* Load Bitmap Font */
     uint8_t *font_pixels = stbi_load("font.png", &font.w, &font.h, &font.bytes_per_pixel, STBI_rgb);
     if (!font_pixels)
         fprintf(stderr, "Failed to load font: font.png\n");
@@ -106,7 +141,6 @@ void do_input() {
                     break;
 
                 /* controller buttons */
-
                 case SDL_SCANCODE_UP:
                 {
                     uint8_t mask = event.type == SDL_KEYDOWN ? CONTROLLER_UP : 0;
@@ -169,8 +203,49 @@ void do_input() {
             }
             break;
 
+        case SDL_JOYBUTTONDOWN:
+        case SDL_JOYBUTTONUP:
+        {
+            int joy_id = event.jbutton.which;
+            switch (event.jbutton.button) 
+            {
+                case 0: /* A Button */
+                {
+                    uint8_t mask = event.type == SDL_JOYBUTTONDOWN ? CONTROLLER_A : 0;
+                    platform_state.controller_states[joy_id] = 
+                        (platform_state.controller_states[joy_id] & ~CONTROLLER_A) | mask;
+                    break;
+                }
+                case 2: /* B Button */
+                {
+                    uint8_t mask = event.type == SDL_JOYBUTTONDOWN ? CONTROLLER_B : 0;
+                    platform_state.controller_states[joy_id] = 
+                        (platform_state.controller_states[joy_id] & ~CONTROLLER_B) | mask;
+                    break;
+                }
+                case 6: /* Select Button */
+                {
+                    uint8_t mask = event.type == SDL_JOYBUTTONDOWN ? CONTROLLER_SELECT : 0;
+                    platform_state.controller_states[0] = 
+                        (platform_state.controller_states[0] & ~CONTROLLER_SELECT) | mask;
+                    break;
+                } 
+                case 7: /* Start Button */
+                {
+                    uint8_t mask = event.type == SDL_JOYBUTTONDOWN ? CONTROLLER_START : 0;
+                    platform_state.controller_states[0] = 
+                        (platform_state.controller_states[0] & ~CONTROLLER_START) | mask;
+                    break;
+                } 
+                default:
+                    break;
+            }
+            break;
+        }
+
         default:
             break;
+
         }
     }
 }
