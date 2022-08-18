@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "bus.h"
+#include "cpu_6502.h"
 #include "cart.h"
 #include "ppu.h"
 

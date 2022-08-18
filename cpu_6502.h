@@ -6,14 +6,16 @@
 
 #define OP_COUNT 256
 
-typedef struct {
+typedef struct cpu_t cpu_t;
+
+struct cpu_t {
     uint8_t a, x, y, sp, status;
     uint16_t pc;
     uint8_t opcode;   /* stores current opcode fetched, used for the few instructions that have memory and accumulator modes */
     uint8_t op_cycles;
     uint64_t cycles;
     bool running;
-} cpu_t;
+};
 
 typedef struct {
     char name[4];
