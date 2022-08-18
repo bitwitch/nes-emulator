@@ -12,7 +12,7 @@ static struct {
 
 static SDL_Window *window;
 static SDL_Renderer *renderer;
-static SDL_Joystick *joysticks[2];
+static SDL_GameController *controllers[2];
 
 #define MAX_SPRITES 16
 static sprite_t *sprites[MAX_SPRITES];
@@ -23,10 +23,12 @@ platform_state_t last_platform_state;
 uint8_t controller_registers[2];
 
 static void generate_font_glyphs(void);
+static void do_keyboard_input(SDL_KeyboardEvent *event);
+static void do_controller_input(SDL_ControllerButtonEvent *event);
 
 
 void io_init(void) {
-    if (SDL_Init(SDL_INIT_VIDEO|SDL_INIT_JOYSTICK) < 0) {
+    if (SDL_Init(SDL_INIT_VIDEO|SDL_INIT_JOYSTICK|SDL_INIT_GAMECONTROLLER) < 0) {
         printf("Failed to initialize SDL: %s\n", SDL_GetError());
         exit(1);
     }
@@ -51,38 +53,29 @@ void io_init(void) {
     memset(&platform_state, 0, sizeof(platform_state));
     memset(&last_platform_state, 0, sizeof(last_platform_state));
 
-    /* Joysticks */
-    int num_joysticks = SDL_NumJoysticks();
+    /* Controllers */
+    int num_controllers = SDL_NumJoysticks();
 
-    if (num_joysticks == 0)
-        printf("No joysticks connected\n");
+    if (num_controllers == 0)
+        printf("No controllers connected\n");
 
-    if (num_joysticks > 0) {
-        joysticks[0] = SDL_JoystickOpen(0);
-        if (joysticks[0]) {
-            printf("Opened Joystick 0\n");
-            printf("    Name: %s\n", SDL_JoystickNameForIndex(0));
-            printf("    Number of Axes: %d\n", SDL_JoystickNumAxes(joysticks[0]));
-            printf("    Number of Buttons: %d\n", SDL_JoystickNumButtons(joysticks[0]));
-            printf("    Number of Balls: %d\n", SDL_JoystickNumBalls(joysticks[0]));
-        } else {
-            printf("Error: Failed to open Joystick 0\n");
-        }
+    if (num_controllers > 0) {
+        if (SDL_IsGameController(0))
+            controllers[0] = SDL_GameControllerOpen(0);
+        if (controllers[0])
+            printf("Opened controller 0: %s\n", SDL_GameControllerNameForIndex(0));
+        else 
+            printf("Error: Failed to open controller 0\n");
     }
 
-    if (num_joysticks > 1) {
-        joysticks[0] = SDL_JoystickOpen(1);
-        if (joysticks[1]) {
-            printf("Opened Joystick 1\n");
-            printf("    Name: %s\n", SDL_JoystickNameForIndex(1));
-            printf("    Number of Axes: %d\n", SDL_JoystickNumAxes(joysticks[1]));
-            printf("    Number of Buttons: %d\n", SDL_JoystickNumButtons(joysticks[1]));
-            printf("    Number of Balls: %d\n", SDL_JoystickNumBalls(joysticks[1]));
-        } else {
-            printf("Error: Failed to open Joystick 1\n");
-        }
+    if (num_controllers > 1) {
+        if (SDL_IsGameController(1))
+            controllers[1] = SDL_GameControllerOpen(1);
+        if (controllers[1])
+            printf("Opened controller 1: %s\n", SDL_GameControllerNameForIndex(1));
+        else 
+            printf("Error: Failed to open controller 1\n");
     }
-
 
     /* Load Bitmap Font */
     uint8_t *font_pixels = stbi_load("font.png", &font.w, &font.h, &font.bytes_per_pixel, STBI_rgb);
@@ -121,134 +114,171 @@ void do_input() {
 
     while (SDL_PollEvent(&event)) {
         switch (event.type) {
-        case SDL_QUIT:
-            /*game.quit = true;*/
-            exit(0);
-            break;
+            case SDL_QUIT:
+                /*game.quit = true;*/
+                exit(0);
+                break;
 
-        case SDL_KEYDOWN:
-        case SDL_KEYUP:
-            if (event.key.repeat == 0) {
-                switch(event.key.keysym.scancode) {
-                case SDL_SCANCODE_RETURN:
-                    platform_state.enter = event.type == SDL_KEYDOWN;
-                    break;
-                case SDL_SCANCODE_SPACE:
-                    platform_state.space = event.type == SDL_KEYDOWN;
-                    break;
-                case SDL_SCANCODE_F:
-                    platform_state.f = event.type == SDL_KEYDOWN;
-                    break;
+            case SDL_KEYDOWN:
+            case SDL_KEYUP:
+                do_keyboard_input(&event.key);
+                break;
 
-                /* controller buttons */
-                case SDL_SCANCODE_UP:
-                {
-                    uint8_t mask = event.type == SDL_KEYDOWN ? CONTROLLER_UP : 0;
-                    platform_state.controller_states[0] = 
-                        (platform_state.controller_states[0] & ~CONTROLLER_UP) | mask;
-                    break;
-                } 
-                case SDL_SCANCODE_DOWN:
-                {
-                    uint8_t mask = event.type == SDL_KEYDOWN ? CONTROLLER_DOWN : 0;
-                    platform_state.controller_states[0] = 
-                        (platform_state.controller_states[0] & ~CONTROLLER_DOWN) | mask;
-                    break;
-                } 
-                case SDL_SCANCODE_LEFT:
-                {
-                    uint8_t mask = event.type == SDL_KEYDOWN ? CONTROLLER_LEFT : 0;
-                    platform_state.controller_states[0] = 
-                        (platform_state.controller_states[0] & ~CONTROLLER_LEFT) | mask;
-                    break;
-                } 
-                case SDL_SCANCODE_RIGHT:
-                {
-                    uint8_t mask = event.type == SDL_KEYDOWN ? CONTROLLER_RIGHT : 0;
-                    platform_state.controller_states[0] = 
-                        (platform_state.controller_states[0] & ~CONTROLLER_RIGHT) | mask;
-                    break;
-                } 
-                case SDL_SCANCODE_S:
-                {
-                    uint8_t mask = event.type == SDL_KEYDOWN ? CONTROLLER_SELECT : 0;
-                    platform_state.controller_states[0] = 
-                        (platform_state.controller_states[0] & ~CONTROLLER_SELECT) | mask;
-                    break;
-                } 
-                case SDL_SCANCODE_D:
-                {
-                    uint8_t mask = event.type == SDL_KEYDOWN ? CONTROLLER_START : 0;
-                    platform_state.controller_states[0] = 
-                        (platform_state.controller_states[0] & ~CONTROLLER_START) | mask;
-                    break;
-                } 
-                case SDL_SCANCODE_C:
-                {
-                    uint8_t mask = event.type == SDL_KEYDOWN ? CONTROLLER_A : 0;
-                    platform_state.controller_states[0] = 
-                        (platform_state.controller_states[0] & ~CONTROLLER_A) | mask;
-                    break;
-                } 
-                case SDL_SCANCODE_X:
-                {
-                    uint8_t mask = event.type == SDL_KEYDOWN ? CONTROLLER_B : 0;
-                    platform_state.controller_states[0] = 
-                        (platform_state.controller_states[0] & ~CONTROLLER_B) | mask;
-                    break;
-                } 
-                default:
-                    break;
-                }
-            }
-            break;
+            case SDL_CONTROLLERBUTTONDOWN:
+            case SDL_CONTROLLERBUTTONUP:
+                do_controller_input(&event.cbutton);
+                break;
 
-        case SDL_JOYBUTTONDOWN:
-        case SDL_JOYBUTTONUP:
-        {
-            int joy_id = event.jbutton.which;
-            switch (event.jbutton.button) 
-            {
-                case 0: /* A Button */
-                {
-                    uint8_t mask = event.type == SDL_JOYBUTTONDOWN ? CONTROLLER_A : 0;
-                    platform_state.controller_states[joy_id] = 
-                        (platform_state.controller_states[joy_id] & ~CONTROLLER_A) | mask;
-                    break;
-                }
-                case 2: /* B Button */
-                {
-                    uint8_t mask = event.type == SDL_JOYBUTTONDOWN ? CONTROLLER_B : 0;
-                    platform_state.controller_states[joy_id] = 
-                        (platform_state.controller_states[joy_id] & ~CONTROLLER_B) | mask;
-                    break;
-                }
-                case 6: /* Select Button */
-                {
-                    uint8_t mask = event.type == SDL_JOYBUTTONDOWN ? CONTROLLER_SELECT : 0;
-                    platform_state.controller_states[0] = 
-                        (platform_state.controller_states[0] & ~CONTROLLER_SELECT) | mask;
-                    break;
-                } 
-                case 7: /* Start Button */
-                {
-                    uint8_t mask = event.type == SDL_JOYBUTTONDOWN ? CONTROLLER_START : 0;
-                    platform_state.controller_states[0] = 
-                        (platform_state.controller_states[0] & ~CONTROLLER_START) | mask;
-                    break;
-                } 
-                default:
-                    break;
-            }
-            break;
-        }
-
-        default:
-            break;
-
+            default:
+                break;
         }
     }
 }
+
+static void do_keyboard_input(SDL_KeyboardEvent *event) {
+    if (event->repeat)
+        return;
+
+    switch(event->keysym.scancode) {
+        /* emulator buttons */
+        case SDL_SCANCODE_RETURN:
+            platform_state.enter = event->type == SDL_KEYDOWN;
+            break;
+        case SDL_SCANCODE_SPACE:
+            platform_state.space = event->type == SDL_KEYDOWN;
+            break;
+        case SDL_SCANCODE_F:
+            platform_state.f = event->type == SDL_KEYDOWN;
+            break;
+
+        /* nes controller buttons */
+        case SDL_SCANCODE_UP:
+        {
+            uint8_t mask = event->type == SDL_KEYDOWN ? CONTROLLER_UP : 0;
+            platform_state.controller_states[0] = 
+                (platform_state.controller_states[0] & ~CONTROLLER_UP) | mask;
+            break;
+        } 
+        case SDL_SCANCODE_DOWN:
+        {
+            uint8_t mask = event->type == SDL_KEYDOWN ? CONTROLLER_DOWN : 0;
+            platform_state.controller_states[0] = 
+                (platform_state.controller_states[0] & ~CONTROLLER_DOWN) | mask;
+            break;
+        } 
+        case SDL_SCANCODE_LEFT:
+        {
+            uint8_t mask = event->type == SDL_KEYDOWN ? CONTROLLER_LEFT : 0;
+            platform_state.controller_states[0] = 
+                (platform_state.controller_states[0] & ~CONTROLLER_LEFT) | mask;
+            break;
+        } 
+        case SDL_SCANCODE_RIGHT:
+        {
+            uint8_t mask = event->type == SDL_KEYDOWN ? CONTROLLER_RIGHT : 0;
+            platform_state.controller_states[0] = 
+                (platform_state.controller_states[0] & ~CONTROLLER_RIGHT) | mask;
+            break;
+        } 
+        case SDL_SCANCODE_S:
+        {
+            uint8_t mask = event->type == SDL_KEYDOWN ? CONTROLLER_SELECT : 0;
+            platform_state.controller_states[0] = 
+                (platform_state.controller_states[0] & ~CONTROLLER_SELECT) | mask;
+            break;
+        } 
+        case SDL_SCANCODE_D:
+        {
+            uint8_t mask = event->type == SDL_KEYDOWN ? CONTROLLER_START : 0;
+            platform_state.controller_states[0] = 
+                (platform_state.controller_states[0] & ~CONTROLLER_START) | mask;
+            break;
+        } 
+        case SDL_SCANCODE_C:
+        {
+            uint8_t mask = event->type == SDL_KEYDOWN ? CONTROLLER_A : 0;
+            platform_state.controller_states[0] = 
+                (platform_state.controller_states[0] & ~CONTROLLER_A) | mask;
+            break;
+        } 
+        case SDL_SCANCODE_X:
+        {
+            uint8_t mask = event->type == SDL_KEYDOWN ? CONTROLLER_B : 0;
+            platform_state.controller_states[0] = 
+                (platform_state.controller_states[0] & ~CONTROLLER_B) | mask;
+            break;
+        } 
+        default:
+            break;
+    }
+}
+
+/* controller input is based on the xbox 360 controller */
+static void do_controller_input(SDL_ControllerButtonEvent *event) {
+    int con_id = event->which;
+    switch (event->button) 
+    {
+        case SDL_CONTROLLER_BUTTON_A:
+        {
+            uint8_t mask = event->type == SDL_CONTROLLERBUTTONDOWN ? CONTROLLER_A : 0;
+            platform_state.controller_states[con_id] = 
+                (platform_state.controller_states[con_id] & ~CONTROLLER_A) | mask;
+            break;
+        }
+        case SDL_CONTROLLER_BUTTON_X: /*xbox x button maps well to nes b button */
+        {
+            uint8_t mask = event->type == SDL_CONTROLLERBUTTONDOWN ? CONTROLLER_B : 0;
+            platform_state.controller_states[con_id] = 
+                (platform_state.controller_states[con_id] & ~CONTROLLER_B) | mask;
+            break;
+        }
+        case SDL_CONTROLLER_BUTTON_BACK: 
+        {
+            uint8_t mask = event->type == SDL_CONTROLLERBUTTONDOWN ? CONTROLLER_SELECT : 0;
+            platform_state.controller_states[con_id] = 
+                (platform_state.controller_states[con_id] & ~CONTROLLER_SELECT) | mask;
+            break;
+        } 
+        case SDL_CONTROLLER_BUTTON_START: 
+        {
+            uint8_t mask = event->type == SDL_CONTROLLERBUTTONDOWN ? CONTROLLER_START : 0;
+            platform_state.controller_states[con_id] = 
+                (platform_state.controller_states[con_id] & ~CONTROLLER_START) | mask;
+            break;
+        } 
+        case SDL_CONTROLLER_BUTTON_DPAD_UP: 
+        {
+            uint8_t mask = event->type == SDL_CONTROLLERBUTTONDOWN ? CONTROLLER_UP : 0;
+            platform_state.controller_states[con_id] = 
+                (platform_state.controller_states[con_id] & ~CONTROLLER_UP) | mask;
+            break;
+        } 
+        case SDL_CONTROLLER_BUTTON_DPAD_DOWN: 
+        {
+            uint8_t mask = event->type == SDL_CONTROLLERBUTTONDOWN ? CONTROLLER_DOWN : 0;
+            platform_state.controller_states[con_id] = 
+                (platform_state.controller_states[con_id] & ~CONTROLLER_DOWN) | mask;
+            break;
+        } 
+        case SDL_CONTROLLER_BUTTON_DPAD_LEFT: 
+        {
+            uint8_t mask = event->type == SDL_CONTROLLERBUTTONDOWN ? CONTROLLER_LEFT : 0;
+            platform_state.controller_states[con_id] = 
+                (platform_state.controller_states[con_id] & ~CONTROLLER_LEFT) | mask;
+            break;
+        } 
+        case SDL_CONTROLLER_BUTTON_DPAD_RIGHT: 
+        {
+            uint8_t mask = event->type == SDL_CONTROLLERBUTTONDOWN ? CONTROLLER_RIGHT : 0;
+            platform_state.controller_states[con_id] = 
+                (platform_state.controller_states[con_id] & ~CONTROLLER_RIGHT) | mask;
+            break;
+        } 
+        default:
+            break;
+    }
+}
+
 
 void controller_write(int controller_index, uint8_t data) {
     assert(controller_index == 0 || controller_index == 1);
