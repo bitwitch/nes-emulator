@@ -23,4 +23,11 @@ https://www.copetti.org/writings/consoles/nes/
 http://6502.org/tutorials/interrupts.html  
 https://www.youtube.com/watch?v=F8kx56OZQhg&list=PLrOv9FMX8xJHqMvSGB_9G9nZZ_4IgteYf&index=2  
 https://nescartdb.com/  
+**APU**  
 https://www.nesdev.org/apu_ref.txt  
+https://github.com/Grieverheart/sdl_tone_oscillator  
+http://nicktasios.nl/posts/making-sounds-using-sdl-and-visualizing-them-on-a-simulated-oscilloscope.html  
+https://forums.nesdev.org/viewtopic.php?f=3&t=13749  
+https://forums.nesdev.org/viewtopic.php?f=3&t=13767  
+https://www.reddit.com/r/EmuDev/comments/5gkwi5/gb_apu_sound_emulation/  
+

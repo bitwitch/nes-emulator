@@ -1,6 +1,7 @@
 #include <assert.h>
 #include <signal.h>
 #include "io.h"
+#include "apu.h"
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
@@ -28,7 +29,7 @@ static void do_controller_input(SDL_ControllerButtonEvent *event);
 
 
 void io_init(void) {
-    if (SDL_Init(SDL_INIT_VIDEO|SDL_INIT_JOYSTICK|SDL_INIT_GAMECONTROLLER) < 0) {
+    if (SDL_Init(SDL_INIT_VIDEO|SDL_INIT_JOYSTICK|SDL_INIT_GAMECONTROLLER|SDL_INIT_AUDIO) < 0) {
         printf("Failed to initialize SDL: %s\n", SDL_GetError());
         exit(1);
     }
@@ -101,6 +102,9 @@ void io_init(void) {
     stbi_image_free(font_pixels);
 
     generate_font_glyphs();
+
+    /* Sound */
+    apu_init();
 
     signal(SIGINT, SIG_DFL);
 }

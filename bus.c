@@ -6,6 +6,7 @@
 #include "cpu_6502.h"
 #include "cart.h"
 #include "ppu.h"
+#include "apu.h"
 
 #define MAX_MEMORY 65536
 
@@ -36,10 +37,8 @@ uint8_t bus_read(uint16_t addr) {
         return ppu_read((addr-0x2000)&0x7);
     else if (addr < 0x4020) {
         switch (addr) {
-            case 0x4014: break;
             case 0x4015: 
-                /* apu read */
-                break;
+                return apu_read(addr);
             case 0x4016: 
                 return controller_read(0);
             case 0x4017: 
@@ -70,9 +69,6 @@ void bus_write(uint16_t addr, uint8_t data) {
             }
             break;
         }
-        case 0x4015: 
-            /* apu write */
-            break;
         case 0x4016: 
             /* controller 0 write */
             controller_write(0, data);
@@ -82,7 +78,7 @@ void bus_write(uint16_t addr, uint8_t data) {
             controller_write(1, data);
             break;
         default: 
-            /* apu write */
+            apu_write(addr, data);
             break;
         }
     } 

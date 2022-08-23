@@ -1,12 +1,12 @@
 CC=gcc
 #CFLAGS=-Wall -Wextra -pedantic -D_GNU_SOURCE -O2 $(shell sdl2-config --cflags --libs)
 CFLAGS=-Wall -Wextra -pedantic -Og -g $(shell sdl2-config --cflags --libs)
-LFLAGS := -L/usr/local/lib -lSDL2_mixer -lm
+LFLAGS := -L/usr/local/lib -lm
 
 .PHONY: nes
 
-nes: main.c bus.c cpu_6502.c cart.c io.c ppu.c mappers.c
-	$(CC) -o nes main.c bus.c cpu_6502.c cart.c io.c ppu.c mappers.c $(LFLAGS) $(CFLAGS) 
+nes: main.c bus.c cpu_6502.c cart.c io.c ppu.c mappers.c apu.c
+	$(CC) -o nes main.c bus.c cpu_6502.c cart.c io.c ppu.c mappers.c apu.c $(LFLAGS) $(CFLAGS) 
 
 debug: CFLAGS += -DDEBUG_LOG
 debug: nes
