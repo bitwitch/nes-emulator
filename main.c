@@ -8,6 +8,7 @@
 #include "cart.h"
 #include "io.h"
 #include "ppu.h"
+#include "apu.h"
 
 #define MS_PER_FRAME (1000/60)
 
@@ -93,6 +94,8 @@ int main(int argc, char **argv) {
         last_platform_state = platform_state;
         do_input();
 
+
+
         /* transfer states */
         if (platform_state.enter && !last_platform_state.enter)
             emulation_mode = EM_RUN;
@@ -112,7 +115,9 @@ int main(int argc, char **argv) {
                         ppu_clear_nmi();
                     }
                     cpu_tick(&cpu);
+                    apu_tick();
                     ppu_tick(); ppu_tick(); ppu_tick();
+                    
                 }
                 
                 ppu_clear_frame_completed();
@@ -125,12 +130,15 @@ int main(int argc, char **argv) {
             /* render */
             elapsed_time = get_ticks() - last_frame_time;
             if ((elapsed_time >= MS_PER_FRAME) && frame_prepared) {
-                prepare_drawing();
-                render_sprites();
+                io_render_prepare();
+                io_render_sprites();
                 render_cpu_state(&cpu, cpu_state_lines);
                 render_code(cpu.pc, dasm);
                 /*render_oam_info();*/
-                draw();
+
+                /*apu_render_sound_wave();*/
+
+                io_render_present();
 
                 frame_prepared = false;
                 last_frame_time += MS_PER_FRAME;
@@ -153,6 +161,7 @@ int main(int argc, char **argv) {
                 }
                 do {
                     cpu_tick(&cpu);
+                    apu_tick();
                     ppu_tick(); ppu_tick(); ppu_tick();
                 } while (cpu.op_cycles > 0);
 
@@ -166,12 +175,13 @@ int main(int argc, char **argv) {
             /* render */
             elapsed_time = get_ticks() - last_frame_time;
             if (elapsed_time >= MS_PER_FRAME) {
-                prepare_drawing();
-                render_sprites();
+                io_render_prepare();
+                io_render_sprites();
                 render_cpu_state(&cpu, cpu_state_lines);
                 render_code(cpu.pc, dasm);
                 /*render_oam_info();*/
-                draw();
+                /*apu_render_sound_wave();*/
+                io_render_present();
                 last_frame_time += MS_PER_FRAME;
                 /* NOTE(shaw): since get_ticks is a uint64_t and only has
                  * millisecond precision, the MS_PER_FRAME will be truncated to
@@ -191,6 +201,7 @@ int main(int argc, char **argv) {
                         ppu_clear_nmi();
                     }
                     cpu_tick(&cpu);
+                    apu_tick();
                     ppu_tick(); ppu_tick(); ppu_tick();
                 }
                 
@@ -204,12 +215,13 @@ int main(int argc, char **argv) {
             /* render */
             elapsed_time = get_ticks() - last_frame_time;
             if ((elapsed_time >= MS_PER_FRAME) && frame_prepared) {
-                prepare_drawing();
-                render_sprites();
+                io_render_prepare();
+                io_render_sprites();
                 render_cpu_state(&cpu, cpu_state_lines);
                 render_code(cpu.pc, dasm);
                 /*render_oam_info();*/
-                draw();
+                /*apu_render_sound_wave();*/
+                io_render_present();
 
                 frame_prepared = false;
                 last_frame_time += MS_PER_FRAME;

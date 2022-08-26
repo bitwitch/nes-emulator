@@ -1,8 +1,10 @@
-#include <stdint.h>
+#include "apu.h"
+#include <assert.h>
+#include <stdbool.h>
 #include <stdio.h>
+#include <math.h>
 #include <SDL2/SDL_audio.h>
-
-#define PI 3.1415926535
+#include "io.h"
 
 
 typedef struct {
@@ -22,15 +24,11 @@ typedef struct {
 typedef struct {
     pulse_register_t reg;
     sweep_register_t sweep;
-
     uint8_t length_counter;
+    uint8_t freq_counter;
     uint8_t envelope_counter; 
-    uint16_t timer;
-
-
-    /* TODO(shaw): maybe it would be easier to store sweep variables for each
-     * data point rather than packing them in a "register" byte here */
-    uint8_t sweep_register;
+    uint8_t duty_counter; 
+    uint16_t freq_timer;
 } pulse_channel_t;
 
 typedef struct {
@@ -42,11 +40,38 @@ typedef struct {
 static apu_t apu;
 static uint64_t samples_played;
 
+
+/*
+ * 01000000 (12.5%)
+ * 01100000 (25%)
+ * 01111000 (50%)
+ * 10011111 (25% negated)
+*/
+static const uint8_t duty_table[8] = { 0x40, 0x60, 0x71, 0x9F };
+
+double pulse_lookup_table[31] = { 0, 0.011609139523578026, 0.022939481268011527, 0.034000949216896059, 0.044803001876172609, 0.055354659248956883, 0.065664527956003665, 0.075740824648844587, 0.085591397849462361, 0.095223748338502431, 0.10464504820333041, 0.11386215864759427, 0.12288164665523155, 0.13170980059397538, 0.14035264483627205, 0.14881595346904861, 0.15710526315789472, 0.16522588522588522, 0.17318291700241739, 0.18098125249301955, 0.18862559241706162, 0.19612045365662886, 0.20347017815646784, 0.21067894131185272, 0.21775075987841944, 0.22468949943545349, 0.23149888143176731, 0.23818248984115256, 0.24474377745241579, 0.2511860718171926, 0.25751258087706685 };
+
+double tnd_lookup_table[203] = {0};
+
+static void tick_pulse_channel(pulse_channel_t *pulse) {
+    if (pulse->freq_counter > 0) 
+        --pulse->freq_counter;
+    else {
+        pulse->freq_counter = pulse->freq_timer;
+        pulse->duty_counter = (pulse->duty_counter + 1) & 7;
+    }
+}
+
 /*
  * The callback must completely initialize the buffer; as of SDL 2.0, this
  * buffer is not initialized before the callback is called. If there is nothing
  * to play, the callback should fill the buffer with silence.
+ *
+ * testing shows this gets called around every 12ms
  */
+
+/* NOTE(shaw): This is currently unused, as I switched to SDL_QueueAudio */
+
 void apu_sound_output(void* userdata, uint8_t *byte_buffer, int buffer_size) {
     /*apu_t *apu = (apu_t *)userdata;*/
     (void)userdata;
@@ -57,33 +82,9 @@ void apu_sound_output(void* userdata, uint8_t *byte_buffer, int buffer_size) {
     static const float volume = 0.2;
     static const float frequency = 82.0;
 
-
-    /*
-    69
-
-    512
-
-    (69+512)/44100 = 0.0137 
-    69+(512/44100) = 69.0226
-
-    sample_num
-    -----------------------------------------------   => seconds
-    samples_per_sec
-
-
-
-    [____________________________________] 0.0116 secs
-
-           512 samples
-          44100 samples/sec
-  */
-
-
-
-
     for (int i=0; i<sample_count; ++i, ++samples_played) {
-        double time = i + (samples_played / (double)apu.spec_desired.freq);
-        double x = time * frequency * 2.0f * PI;
+        double time = samples_played / (double)apu.spec_desired.freq;
+        double x = time * frequency * 2.0f * M_PI;
         float val = sin(x);
         buffer[i] = (float)(val * volume);
         /*printf("x=%f val=%f buffer[%d]=%d\n", x, val, i, buffer[i]);*/
@@ -95,8 +96,8 @@ void apu_init(void) {
     apu.spec_desired.format = AUDIO_F32;
     apu.spec_desired.channels = 1;
     apu.spec_desired.samples = 512;
-    apu.spec_desired.callback = apu_sound_output;
-    apu.spec_desired.userdata = &apu;
+    /*apu.spec_desired.callback = apu_sound_output;*/
+    /*apu.spec_desired.userdata = &apu;*/
     apu.audio_device = SDL_OpenAudioDevice(NULL, 0, 
         &apu.spec_desired, &apu.spec_obtained, 
         0);
@@ -133,7 +134,7 @@ void apu_write(uint16_t addr, uint8_t data) {
         case 0x4001:
         /* pulse1 sweep */
         {
-            sweep_register_t *reg = &apu.pulse1.sweep;
+            sweep_register_t *sweep = &apu.pulse1.sweep;
             sweep->enabled     = (data >> 7) & 0x1;
             sweep->divider     = (data >> 4) & 0x7;
             sweep->negate      = (data >> 3) & 0x1;
@@ -141,21 +142,92 @@ void apu_write(uint16_t addr, uint8_t data) {
             break;
         }
         case 0x4002:
-        /* pulse1 timer low */
+        /* pulse1 freq_timer low */
         {
-            apu.pulse1.timer = (apu.pulse1.timer & 0xFF00) | data;
+            apu.pulse1.freq_timer = (apu.pulse1.freq_timer & 0xFF00) | data;
             break;
         }
         case 0x4003:
-        /* pulse1 timer high and length counter load*/
+        /* pulse1 freq_timer high and length counter load*/
         {
-            apu.pulse1.timer = (apu.pulse1.timer & 0x07FF) | ((data & 0x7) << 8);
-            if (pulse1 is enabled)
-                apu.pulse1.length_counter = length_table[(data >> 3) & 0x1F];
+            apu.pulse1.freq_timer = (apu.pulse1.freq_timer & 0x07FF) | ((data & 0x7) << 8);
+            /*if (pulse1 is enabled)*/
+                /*apu.pulse1.length_counter = length_table[(data >> 3) & 0x1F];*/
+            /* reset phase */
+            apu.pulse1.freq_counter = apu.pulse1.freq_timer;
+            apu.pulse1.duty_counter = 0;
+
             break;
         }
     }
 }
+
+
+
+ 
+#define AUDIO_BUFFER_LEN 706
+static float audio_buffer[AUDIO_BUFFER_LEN] = {0}; // ~16ms of audio at 44100 samples / sec
+static int sample_index = 0;
+static bool audio_buffer_full = false;
+
+void apu_tick(void) {
+    static bool even_cycle = true;
+
+    uint8_t pulse1   = 0;
+    uint8_t pulse2   = 0;
+    /*uint8_t triangle = 0;*/
+    /*uint8_t noise    = 0;*/
+    /*uint8_t dmc      = 0;*/
+
+    if (even_cycle) {
+        tick_pulse_channel(&apu.pulse1);
+        /*tick_pulse_channel(&apu.pulse2);*/
+
+        /* tick noise channel */
+
+        /* tick DMC */
+    }
+
+    /* tick triangle channel */
+
+    float output = pulse_lookup_table[pulse1 + pulse2];
+
+    /*float output = pulse_lookup_table[pulse1 + pulse2] + tnd_lookup_table[3*triangle + 2*noise + dmc];*/
+
+    /*static const float volume = 0.2;*/
+    /*static const float frequency = 82.0;*/
+    /*double time = samples_played++ / (double)apu.spec_desired.freq;*/
+    /*double x = time * frequency * 2.0f * M_PI;*/
+    /*float output = sin(x) * volume;*/
+ 
+    audio_buffer[sample_index++] = output;
+
+    if (sample_index >= AUDIO_BUFFER_LEN) {
+        SDL_QueueAudio(apu.audio_device, audio_buffer, sizeof(audio_buffer[0]) * AUDIO_BUFFER_LEN);
+        audio_buffer_full = true;
+        sample_index = 0;
+        if (platform_state.w)
+            render_sound_wave(audio_buffer, AUDIO_BUFFER_LEN);
+    }
+
+    even_cycle = !even_cycle;
+}
+
+
+/*static float visual_audio_buffer[AUDIO_BUFFER_LEN*2];*/
+/*static bool visual_audio_right = true;*/
+/*void apu_render_sound_wave(void) {*/
+    /*if (audio_buffer_full) {*/
+        /*int offset = visual_audio_right ? AUDIO_BUFFER_LEN : 0;*/
+        /*visual_audio_right = !visual_audio_right;*/
+        /*memcpy(visual_audio_buffer + offset, audio_buffer, AUDIO_BUFFER_LEN * sizeof(audio_buffer[0]));*/
+        /*audio_buffer_full = false;*/
+    /*}*/
+
+    /*render_sound_wave(visual_audio_buffer, AUDIO_BUFFER_LEN*2);*/
+/*}*/
+
+
 
 
 

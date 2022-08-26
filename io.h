@@ -29,8 +29,8 @@ typedef struct {
 typedef struct {
     bool enter;
     bool space;
-    bool f;
     bool escape;
+    bool f,w;
 
     uint8_t controller_states[2];
 } platform_state_t;
@@ -52,9 +52,9 @@ extern uint8_t controller_registers[2]; /* parallel to serial shift registers */
 
 void io_init(void);
 void io_deinit(void);
-void prepare_drawing(void);
-void render_sprites(void);
-void draw(void);
+void io_render_prepare(void);
+void io_render_sprites(void);
+void io_render_present(void);
 uint64_t get_ticks(void);
 void controller_write(int controller_index, uint8_t data);
 uint8_t controller_read(int controller_index);
@@ -68,5 +68,7 @@ void register_sprite(sprite_t *sprite);
 void set_font_color(uint32_t color);
 void render_text(char *text, int x, int y);
 void render_text_color(char *text, int x, int y, uint32_t color_mod);
+
+void render_sound_wave(float *audio_buffer, int len);
 
 #endif

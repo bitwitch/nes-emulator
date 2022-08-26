@@ -6,5 +6,7 @@
 void apu_init(void);
 uint8_t apu_read(uint16_t addr);
 void apu_write(uint16_t addr, uint8_t data);
+void apu_tick(void);
+void apu_render_sound_wave(void);
 
 #endif

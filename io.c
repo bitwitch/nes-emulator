@@ -11,9 +11,14 @@ static struct {
     SDL_Rect glyphs[95];
 } font;
 
+
 static SDL_Window *window;
 static SDL_Renderer *renderer;
 static SDL_GameController *controllers[2];
+
+static SDL_Window *wave_window;
+static SDL_Renderer *wave_renderer;
+
 
 #define MAX_SPRITES 16
 static sprite_t *sprites[MAX_SPRITES];
@@ -26,6 +31,7 @@ uint8_t controller_registers[2];
 static void generate_font_glyphs(void);
 static void do_keyboard_input(SDL_KeyboardEvent *event);
 static void do_controller_input(SDL_ControllerButtonEvent *event);
+static void init_wave_window(void);
 
 
 void io_init(void) {
@@ -106,7 +112,28 @@ void io_init(void) {
     /* Sound */
     apu_init();
 
+    init_wave_window();
+
     signal(SIGINT, SIG_DFL);
+}
+
+static void init_wave_window(void) {
+    wave_window = SDL_CreateWindow(
+        "Wave",
+        SDL_WINDOWPOS_UNDEFINED,
+        SDL_WINDOWPOS_UNDEFINED,
+        600, 600,
+        SDL_WINDOW_RESIZABLE);
+
+    if (!wave_window) {
+        fprintf(stderr, "Failed to create wave window: %s\n", SDL_GetError());
+        return;
+    }
+
+    wave_renderer = SDL_CreateRenderer(wave_window, -1, 0);
+
+    if (!wave_renderer)
+        fprintf(stderr, "Failed to create wave renderer: %s\n", SDL_GetError());
 }
 
 /* TODO(shaw): platform_state is now global, doesn't need to be passed in here */
@@ -153,6 +180,9 @@ static void do_keyboard_input(SDL_KeyboardEvent *event) {
             break;
         case SDL_SCANCODE_F:
             platform_state.f = event->type == SDL_KEYDOWN;
+            break;
+        case SDL_SCANCODE_W:
+            platform_state.w = event->type == SDL_KEYDOWN;
             break;
 
         /* nes controller buttons */
@@ -307,21 +337,28 @@ uint64_t get_ticks(void) {
     return SDL_GetTicks64();
 }
 
-void prepare_drawing(void) {
+void io_render_prepare(void) {
+    SDL_SetRenderDrawColor(renderer, 0x00, 0x00, 0x00, 0xFF);
     SDL_RenderClear(renderer);
+
+    /*if (wave_renderer) {*/
+        /*SDL_SetRenderDrawColor(wave_renderer, 0x00, 0x00, 0x00, 0xFF);*/
+        /*SDL_RenderClear(wave_renderer);*/
+    /*}*/
 }
 
-void render_sprites(void) {
+void io_render_sprites(void) {
     for (int i=0; i<sprite_count; ++i) {
         sprite_t *s = sprites[i];
         SDL_UpdateTexture(s->texture, NULL, s->pixels, s->w * sizeof(uint32_t));
         SDL_RenderCopy(renderer, s->texture, &s->srcrect, &s->dstrect);
     }
-
 }
 
-void draw(void) {
+void io_render_present(void) {
     SDL_RenderPresent(renderer);
+    if (wave_renderer)
+        SDL_RenderPresent(wave_renderer);
 }
 
 static void generate_font_glyphs(void) {
@@ -425,6 +462,25 @@ void render_text_color(char *text, int x, int y, uint32_t color) {
         SDL_RenderCopy(renderer, font.texture, &font.glyphs[*c-32], &dstrect);
         SDL_SetTextureColorMod(font.texture, 0xFF, 0xFF, 0xFF);
     }
+}
+
+
+void render_sound_wave(float *audio_buffer, int len) {
+    SDL_SetRenderDrawColor(wave_renderer, 0x00, 0x00, 0x00, 0xFF);
+    SDL_RenderClear(wave_renderer);
+
+    int width = 600;
+    int height = 600;
+
+    SDL_Point points[len];
+    for (int i=0; i<len; ++i) {
+        int x = (i / (float)len) * width;
+        int y = (audio_buffer[i]*0.5f + 0.5f) * height;
+        points[i] = (SDL_Point){ x, y };
+    }
+
+    SDL_SetRenderDrawColor(wave_renderer, 0x00, 0xFF, 0x00, 0xFF);
+    SDL_RenderDrawLines(wave_renderer, points, len);
 }
 
 void io_deinit(void) {
