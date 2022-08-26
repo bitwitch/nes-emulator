@@ -145,6 +145,14 @@ void do_input() {
 
     while (SDL_PollEvent(&event)) {
         switch (event.type) {
+            case SDL_WINDOWEVENT:
+                if (event.window.event == SDL_WINDOWEVENT_CLOSE)
+                        /*&& event.window.windowID == SDL_GetWindowID(window)) */
+                {
+                    exit(0);
+                }
+                break;
+
             case SDL_QUIT:
                 /*game.quit = true;*/
                 exit(0);
