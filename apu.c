@@ -29,13 +29,37 @@ typedef struct {
     uint8_t envelope_counter; 
     uint8_t duty_counter; 
     uint16_t freq_timer;
+    bool enabled;
 } pulse_channel_t;
+
+typedef struct {
+    /*divider;*/
+    /*sequencer;*/
+
+    bool mode;
+    bool irq_pending;
+    bool irq_inhibit;
+    uint8_t step;
+    uint16_t counter;
+
+
+} frame_sequencer_t;
 
 typedef struct {
     SDL_AudioSpec spec_desired, spec_obtained;
     SDL_AudioDeviceID audio_device;
     pulse_channel_t pulse1, pulse2;
+    frame_sequencer_t frame_sequencer;
 } apu_t;
+
+
+static bool should_tick_quarter_frame(void);
+static bool should_tick_half_frame(void);
+static void tick_quarter_frame(void);
+static void tick_half_frame(void);
+static void tick_frame_sequencer(void);
+static bool is_sweep_forcing_silence(void);
+static uint8_t pulse_output(pulse_channel_t *pulse);
 
 static apu_t apu;
 static uint64_t samples_played;
@@ -72,24 +96,24 @@ static void tick_pulse_channel(pulse_channel_t *pulse) {
 
 /* NOTE(shaw): This is currently unused, as I switched to SDL_QueueAudio */
 
-void apu_sound_output(void* userdata, uint8_t *byte_buffer, int buffer_size) {
-    /*apu_t *apu = (apu_t *)userdata;*/
-    (void)userdata;
+/*void apu_sound_output(void* userdata, uint8_t *byte_buffer, int buffer_size) {*/
+    /*[>apu_t *apu = (apu_t *)userdata;<]*/
+    /*(void)userdata;*/
 
-    float *buffer = (float *)byte_buffer;
-    int sample_count = buffer_size / sizeof(buffer[0]);
+    /*float *buffer = (float *)byte_buffer;*/
+    /*int sample_count = buffer_size / sizeof(buffer[0]);*/
 
-    static const float volume = 0.2;
-    static const float frequency = 82.0;
+    /*static const float volume = 0.2;*/
+    /*static const float frequency = 82.0;*/
 
-    for (int i=0; i<sample_count; ++i, ++samples_played) {
-        double time = samples_played / (double)apu.spec_desired.freq;
-        double x = time * frequency * 2.0f * M_PI;
-        float val = sin(x);
-        buffer[i] = (float)(val * volume);
-        /*printf("x=%f val=%f buffer[%d]=%d\n", x, val, i, buffer[i]);*/
-    }
-}
+    /*for (int i=0; i<sample_count; ++i, ++samples_played) {*/
+        /*double time = samples_played / (double)apu.spec_desired.freq;*/
+        /*double x = time * frequency * 2.0f * M_PI;*/
+        /*float val = sin(x);*/
+        /*buffer[i] = (float)(val * volume);*/
+        /*[>printf("x=%f val=%f buffer[%d]=%d\n", x, val, i, buffer[i]);<]*/
+    /*}*/
+/*}*/
 
 void apu_init(void) {
     apu.spec_desired.freq = 44100;
@@ -159,9 +183,126 @@ void apu_write(uint16_t addr, uint8_t data) {
 
             break;
         }
+
+
+
+        case 0x4015:
+        /* status register */
+        {
+            /* TODO(shaw): other channel enable flags */
+            bool p1 = (data >> 0) & 1;
+            bool p2 = (data >> 1) & 1;
+
+            apu.pulse1.enabled = p1;
+            apu.pulse2.enabled = p2;
+
+            if (!p1)
+                apu.pulse1.length_counter = 0;
+            if (!p2)
+                apu.pulse2.length_counter = 0;
+            break;
+        }
+
+        case 0x4017:
+        /* frame sequencer */
+        {
+            frame_sequencer_t *seq = &apu.frame_sequencer;
+            seq->mode        = (data >> 7) & 1;
+            seq->irq_inhibit = (data >> 7) & 2; 
+
+            seq->counter = 7457; /* cpu cycles to next sequence step */
+
+            if (seq->mode) {
+                tick_quarter_frame();
+                tick_half_frame();
+            }
+
+            if (seq->irq_inhibit)
+                seq->irq_pending = 0;
+
+            break;
+        }
     }
 }
 
+static bool should_tick_quarter_frame(void) {
+    uint8_t step = apu.frame_sequencer.step;
+    uint8_t mode = apu.frame_sequencer.mode;
+    if (step < 3) return true;
+    if (!mode && step == 3) return true;
+    if  (mode && step == 4) return true;
+    return false;
+}
+
+static bool should_tick_half_frame(void) {
+    uint8_t step = apu.frame_sequencer.step;
+    uint8_t mode = apu.frame_sequencer.mode;
+    if (step == 1) return true;
+    if (!mode && step == 3) return true;
+    if  (mode && step == 4) return true;
+    return false;
+}
+
+static void tick_quarter_frame(void) {
+    /* TODO(shaw): tick envelope and triangle linear counter */
+}
+
+static void tick_half_frame(void) {
+    /* TODO(shaw): tick sweep units */
+
+
+    /* TODO(shaw): tick other channel length counters */
+
+    if (apu.pulse1.enabled && apu.pulse1.length_counter > 0)
+        --apu.pulse1.length_counter;
+
+}
+
+static void tick_frame_sequencer(void) {
+    frame_sequencer_t *seq = &apu.frame_sequencer;
+    if (seq->counter > 0) {
+        --seq->counter;
+    } else {
+        if (should_tick_quarter_frame())
+            tick_quarter_frame();
+        if (should_tick_half_frame())
+            tick_half_frame();
+        if (!seq->irq_inhibit && !seq->mode && seq->step == 3)
+            seq->irq_pending = true;
+
+        ++seq->step;
+        seq->step %= seq->mode ? 5 : 4;
+            
+        seq->counter = 7457; /* cpu cycles to next sequence step */
+    }
+}
+
+
+static bool is_sweep_forcing_silence(void) {
+    /* TODO(shaw): implement this */
+    return 0;
+}
+
+static uint8_t pulse_output(pulse_channel_t *pulse) {
+    uint8_t output = 0;
+
+    bool duty_high = (duty_table[pulse->reg.duty] >> pulse->duty_counter) & 1;
+    if (duty_high && 
+        pulse->length_counter > 0 && 
+        !is_sweep_forcing_silence())
+    {
+        if(pulse->reg.constant_volume) 
+            output = pulse->reg.envelope;
+        else
+            /*
+             * TODO(shaw): this should be the current envelope volume
+             * output = decay_hidden_vol;
+             * */
+            output = pulse->reg.envelope;
+    }
+
+    return output;
+}
 
 
  
@@ -190,8 +331,11 @@ void apu_tick(void) {
 
     /* tick triangle channel */
 
-    float output = pulse_lookup_table[pulse1 + pulse2];
+    tick_frame_sequencer();
 
+    pulse1 = pulse_output(&apu.pulse1);
+
+    float output = pulse_lookup_table[pulse1 + pulse2];
     /*float output = pulse_lookup_table[pulse1 + pulse2] + tnd_lookup_table[3*triangle + 2*noise + dmc];*/
 
     /*static const float volume = 0.2;*/
