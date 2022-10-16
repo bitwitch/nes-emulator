@@ -31,6 +31,7 @@ typedef struct {
     bool space;
     bool escape;
     bool f,w;
+    bool nine;
 
     uint8_t controller_states[2];
 } platform_state_t;

@@ -9,7 +9,7 @@
 
 typedef struct {
     uint8_t duty            : 2;
-    uint8_t halt            : 1;
+    uint8_t loop            : 1;
     uint8_t constant_volume : 1;
     uint8_t envelope        : 4;
 } pulse_register_t;
@@ -26,7 +26,11 @@ typedef struct {
     sweep_register_t sweep;
     uint8_t length_counter;
     uint8_t freq_counter;
+    bool envelope_start; 
     uint8_t envelope_counter; 
+    uint8_t envelope_current_volume; 
+    bool sweep_reload; 
+    uint8_t sweep_counter; 
     uint8_t duty_counter; 
     uint16_t freq_timer;
     bool enabled;
@@ -57,8 +61,10 @@ static bool should_tick_quarter_frame(void);
 static bool should_tick_half_frame(void);
 static void tick_quarter_frame(void);
 static void tick_half_frame(void);
+static void tick_pulse_envelope(pulse_channel_t *pulse);
+static void tick_pulse_sweep(pulse_channel_t *pulse, bool is_pulse_2);
 static void tick_frame_sequencer(void);
-static bool is_sweep_forcing_silence(void);
+static bool is_sweep_forcing_silence(pulse_channel_t *pulse);
 static uint8_t pulse_output(pulse_channel_t *pulse);
 
 static apu_t apu;
@@ -71,11 +77,13 @@ static uint64_t samples_played;
  * 01111000 (50%)
  * 10011111 (25% negated)
 */
-static const uint8_t duty_table[8] = { 0x40, 0x60, 0x71, 0x9F };
+static const uint8_t duty_table[4] = { 0x40, 0x60, 0x71, 0x9F };
 
 double pulse_lookup_table[31] = { 0, 0.011609139523578026, 0.022939481268011527, 0.034000949216896059, 0.044803001876172609, 0.055354659248956883, 0.065664527956003665, 0.075740824648844587, 0.085591397849462361, 0.095223748338502431, 0.10464504820333041, 0.11386215864759427, 0.12288164665523155, 0.13170980059397538, 0.14035264483627205, 0.14881595346904861, 0.15710526315789472, 0.16522588522588522, 0.17318291700241739, 0.18098125249301955, 0.18862559241706162, 0.19612045365662886, 0.20347017815646784, 0.21067894131185272, 0.21775075987841944, 0.22468949943545349, 0.23149888143176731, 0.23818248984115256, 0.24474377745241579, 0.2511860718171926, 0.25751258087706685 };
 
 double tnd_lookup_table[203] = {0};
+
+uint8_t length_table[32] = {10, 254, 20, 2, 40, 4, 80, 6, 160, 8, 60, 10, 14, 12, 26, 14, 12, 16, 24, 18, 48, 20, 96, 22, 192, 24, 72, 26, 16, 28, 32, 30 };
 
 static void tick_pulse_channel(pulse_channel_t *pulse) {
     if (pulse->freq_counter > 0) 
@@ -136,8 +144,21 @@ void apu_init(void) {
 
 uint8_t apu_read(uint16_t addr) {
     if (addr == 0x4015) { /* status register */
-        /* see https://www.nesdev.org/wiki/APU#Status_($4015) */
-        assert(0 && "not implemented");
+        uint8_t data = 0;
+        frame_sequencer_t *seq = &apu.frame_sequencer;
+
+        if (apu.pulse1.length_counter > 0)
+            data |= 0x01;
+        if (apu.pulse2.length_counter > 0)
+            data |= 0x02;
+        // TODO(shaw): length counters for triangle and noise channels 
+
+        if (seq->irq_pending)
+            data |= 0x40;
+        
+        seq->irq_pending = false;
+
+        return data;
     }
 
     return 0;
@@ -145,12 +166,13 @@ uint8_t apu_read(uint16_t addr) {
 
 void apu_write(uint16_t addr, uint8_t data) {
     switch(addr) {
+        /* PULSE 1 */
         case 0x4000:
         /* pulse1 volume */
         {
             pulse_register_t *reg = &apu.pulse1.reg;
             reg->duty            = (data >> 6) & 0x3;
-            reg->halt            = (data >> 5) & 0x1;
+            reg->loop            = (data >> 5) & 0x1;
             reg->constant_volume = (data >> 4) & 0x1;
             reg->envelope        = (data >> 0) & 0xF;
             break;
@@ -175,12 +197,54 @@ void apu_write(uint16_t addr, uint8_t data) {
         /* pulse1 freq_timer high and length counter load*/
         {
             apu.pulse1.freq_timer = (apu.pulse1.freq_timer & 0x07FF) | ((data & 0x7) << 8);
-            /*if (pulse1 is enabled)*/
-                /*apu.pulse1.length_counter = length_table[(data >> 3) & 0x1F];*/
+            if (apu.pulse1.enabled)
+                apu.pulse1.length_counter = length_table[(data >> 3) & 0x1F];
             /* reset phase */
             apu.pulse1.freq_counter = apu.pulse1.freq_timer;
             apu.pulse1.duty_counter = 0;
 
+            apu.pulse1.envelope_start = true;
+            break;
+        }
+
+        /* PULSE 2 */
+        case 0x4004:
+        /* pulse2 volume */
+        {
+            pulse_register_t *reg = &apu.pulse2.reg;
+            reg->duty            = (data >> 6) & 0x3;
+            reg->loop            = (data >> 5) & 0x1;
+            reg->constant_volume = (data >> 4) & 0x1;
+            reg->envelope        = (data >> 0) & 0xF;
+            break;
+        }
+        case 0x4005:
+        /* pulse2 sweep */
+        {
+            sweep_register_t *sweep = &apu.pulse2.sweep;
+            sweep->enabled     = (data >> 7) & 0x1;
+            sweep->divider     = (data >> 4) & 0x7;
+            sweep->negate      = (data >> 3) & 0x1;
+            sweep->shift_count = (data >> 0) & 0x7;
+            break;
+        }
+        case 0x4006:
+        /* pulse2 freq_timer low */
+        {
+            apu.pulse2.freq_timer = (apu.pulse2.freq_timer & 0xFF00) | data;
+            break;
+        }
+        case 0x4007:
+        /* pulse2 freq_timer high and length counter load*/
+        {
+            apu.pulse2.freq_timer = (apu.pulse2.freq_timer & 0x07FF) | ((data & 0x7) << 8);
+            if (apu.pulse2.enabled)
+                apu.pulse2.length_counter = length_table[(data >> 3) & 0x1F];
+            /* reset phase */
+            apu.pulse2.freq_counter = apu.pulse2.freq_timer;
+            apu.pulse2.duty_counter = 0;
+
+            apu.pulse2.envelope_start = true;
             break;
         }
 
@@ -202,13 +266,12 @@ void apu_write(uint16_t addr, uint8_t data) {
                 apu.pulse2.length_counter = 0;
             break;
         }
-
         case 0x4017:
         /* frame sequencer */
         {
             frame_sequencer_t *seq = &apu.frame_sequencer;
             seq->mode        = (data >> 7) & 1;
-            seq->irq_inhibit = (data >> 7) & 2; 
+            seq->irq_inhibit = (data >> 6) & 1; 
 
             seq->counter = 7457; /* cpu cycles to next sequence step */
 
@@ -243,19 +306,66 @@ static bool should_tick_half_frame(void) {
     return false;
 }
 
+static void tick_pulse_envelope(pulse_channel_t *pulse) {
+    if (pulse->envelope_start) {
+        pulse->envelope_start = false;
+        pulse->envelope_current_volume = 0xF;
+        pulse->envelope_counter = pulse->reg.envelope;
+    } else {
+        if (pulse->envelope_counter > 0)
+            --pulse->envelope_counter;
+        else {
+            pulse->envelope_counter = pulse->reg.envelope;
+            if (pulse->envelope_current_volume > 0)
+                --pulse->envelope_current_volume;
+            else if (pulse->reg.loop)
+                pulse->envelope_current_volume = 0xF;
+        }
+    }
+}
+
 static void tick_quarter_frame(void) {
-    /* TODO(shaw): tick envelope and triangle linear counter */
+    /* tick envelope and triangle linear counter */
+    tick_pulse_envelope(&apu.pulse1);
+    tick_pulse_envelope(&apu.pulse2);
+
+    /* TODO(shaw) tick triangle linear counter */
+}
+
+
+static void tick_pulse_sweep(pulse_channel_t *pulse, bool is_pulse_2) {
+    if (pulse->sweep_reload) {
+        pulse->sweep_counter = pulse->sweep.divider;
+        pulse->sweep_reload = false;
+        // note there's an edge case here -- see http://wiki.nesdev.com/w/index.php/APU_Sweep
+        //   for details.  You can probably ignore it for now
+    } else if (pulse->sweep_counter > 0) {
+        --pulse->sweep_counter;
+    } else {
+        pulse->sweep_counter = pulse->sweep.divider;
+        if (pulse->sweep.enabled && !is_sweep_forcing_silence(pulse)) {
+            if(pulse->sweep.negate) {
+                pulse->freq_timer -= pulse->freq_timer >> pulse->sweep.shift_count;
+                if (is_pulse_2)
+                    pulse->freq_timer -= 1;
+            }
+            else
+                pulse->freq_timer += (pulse->freq_timer >> pulse->sweep.shift_count);
+        }
+    }
 }
 
 static void tick_half_frame(void) {
     /* TODO(shaw): tick sweep units */
-
+    tick_pulse_sweep(&apu.pulse1, false);
+    tick_pulse_sweep(&apu.pulse2, true);
 
     /* TODO(shaw): tick other channel length counters */
 
     if (apu.pulse1.enabled && apu.pulse1.length_counter > 0)
         --apu.pulse1.length_counter;
-
+    if (apu.pulse2.enabled && apu.pulse2.length_counter > 0)
+        --apu.pulse2.length_counter;
 }
 
 static void tick_frame_sequencer(void) {
@@ -278,9 +388,14 @@ static void tick_frame_sequencer(void) {
 }
 
 
-static bool is_sweep_forcing_silence(void) {
-    /* TODO(shaw): implement this */
-    return 0;
+static bool is_sweep_forcing_silence(pulse_channel_t *pulse) {
+    sweep_register_t *sweep = &apu.pulse1.sweep;
+    if (pulse->freq_timer < 8)
+        return true;
+    else if (!sweep->negate && (pulse->freq_timer + (pulse->freq_timer >> sweep->shift_count)) > 0x7FF)
+        return true;
+    else
+        return false;
 }
 
 static uint8_t pulse_output(pulse_channel_t *pulse) {
@@ -289,7 +404,7 @@ static uint8_t pulse_output(pulse_channel_t *pulse) {
     bool duty_high = (duty_table[pulse->reg.duty] >> pulse->duty_counter) & 1;
     if (duty_high && 
         pulse->length_counter > 0 && 
-        !is_sweep_forcing_silence())
+        !is_sweep_forcing_silence(pulse))
     {
         if(pulse->reg.constant_volume) 
             output = pulse->reg.envelope;
@@ -311,18 +426,21 @@ static float audio_buffer[AUDIO_BUFFER_LEN] = {0}; // ~16ms of audio at 44100 sa
 static int sample_index = 0;
 static bool audio_buffer_full = false;
 
+
 void apu_tick(void) {
+    static int downsample_counter = -1;
+    static bool downsample_even = 0;
     static bool even_cycle = true;
 
     uint8_t pulse1   = 0;
     uint8_t pulse2   = 0;
-    /*uint8_t triangle = 0;*/
-    /*uint8_t noise    = 0;*/
-    /*uint8_t dmc      = 0;*/
+    uint8_t triangle = 0;
+    uint8_t noise    = 0;
+    uint8_t dmc      = 0;
 
     if (even_cycle) {
         tick_pulse_channel(&apu.pulse1);
-        /*tick_pulse_channel(&apu.pulse2);*/
+        tick_pulse_channel(&apu.pulse2);
 
         /* tick noise channel */
 
@@ -334,8 +452,13 @@ void apu_tick(void) {
     tick_frame_sequencer();
 
     pulse1 = pulse_output(&apu.pulse1);
+    pulse2 = pulse_output(&apu.pulse2);
 
-    float output = pulse_lookup_table[pulse1 + pulse2];
+    float pulse_out = 0.00752 * (pulse1 + pulse2);
+    float tnd_out = 0.00851 * triangle + 0.00494 * noise + 0.00335 * dmc;
+    float output = pulse_out + tnd_out;
+
+    /*float output = pulse_lookup_table[pulse1 + pulse2];*/
     /*float output = pulse_lookup_table[pulse1 + pulse2] + tnd_lookup_table[3*triangle + 2*noise + dmc];*/
 
     /*static const float volume = 0.2;*/
@@ -343,8 +466,16 @@ void apu_tick(void) {
     /*double time = samples_played++ / (double)apu.spec_desired.freq;*/
     /*double x = time * frequency * 2.0f * M_PI;*/
     /*float output = sin(x) * volume;*/
- 
-    audio_buffer[sample_index++] = output;
+
+    // HACK: this is simulating downsampling the tick rate of the apu to approximate a 44100Hz sample rate 
+    ++downsample_counter;
+    /*int s = downsample_even ? 39 : 40;*/
+    int s = downsample_even ? 35 : 36;
+    if (downsample_counter >= s) {
+        audio_buffer[sample_index++] = output;
+        downsample_counter = 0;
+        downsample_even = !downsample_even;
+    }
 
     if (sample_index >= AUDIO_BUFFER_LEN) {
         SDL_QueueAudio(apu.audio_device, audio_buffer, sizeof(audio_buffer[0]) * AUDIO_BUFFER_LEN);
