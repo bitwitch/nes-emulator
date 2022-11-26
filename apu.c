@@ -38,6 +38,19 @@ typedef struct {
 } pulse_channel_t;
 
 typedef struct {
+    bool linear_control;
+    bool enabled;
+    bool linear_reload_flag;
+    bool ultrasonic;
+    uint8_t linear_load;
+    uint16_t freq_timer;
+    uint16_t freq_counter;
+    uint8_t length_counter;
+    uint8_t linear_counter;
+    uint8_t step;
+} tri_channel_t;
+
+typedef struct {
     /*divider;*/
     /*sequencer;*/
 
@@ -47,13 +60,14 @@ typedef struct {
     uint8_t step;
     uint16_t counter;
 
-
 } frame_sequencer_t;
+
 
 typedef struct {
     SDL_AudioSpec spec_desired, spec_obtained;
     SDL_AudioDeviceID audio_device;
     pulse_channel_t pulse1, pulse2;
+    tri_channel_t triangle;
     frame_sequencer_t frame_sequencer;
 } apu_t;
 
@@ -78,14 +92,16 @@ static bool should_tick_quarter_frame(void);
 static bool should_tick_half_frame(void);
 static void tick_quarter_frame(void);
 static void tick_half_frame(void);
+static void tick_pulse_channel(pulse_channel_t *pulse);
 static void tick_pulse_envelope(pulse_channel_t *pulse);
 static void tick_pulse_sweep(pulse_channel_t *pulse, bool is_pulse_2);
+static void tick_triangle_channel(void);
 static void tick_frame_sequencer(void);
 static bool is_sweep_forcing_silence(pulse_channel_t *pulse);
 static uint8_t pulse_output(pulse_channel_t *pulse);
 
 static apu_t apu;
-static uint64_t samples_played;
+/*static uint64_t samples_played;*/
 
 
 /*
@@ -115,15 +131,6 @@ double pulse_lookup_table[31] = { 0, 0.011609139523578026, 0.022939481268011527,
 double tnd_lookup_table[203] = {0};
 
 uint8_t length_table[32] = {10, 254, 20, 2, 40, 4, 80, 6, 160, 8, 60, 10, 14, 12, 26, 14, 12, 16, 24, 18, 48, 20, 96, 22, 192, 24, 72, 26, 16, 28, 32, 30 };
-
-static void tick_pulse_channel(pulse_channel_t *pulse) {
-    if (pulse->freq_counter > 0) 
-        --pulse->freq_counter;
-    else {
-        pulse->freq_counter = pulse->freq_timer;
-        pulse->duty_counter = (pulse->duty_counter + 1) & 7;
-    }
-}
 
 /*
  * The callback must completely initialize the buffer; as of SDL 2.0, this
@@ -233,7 +240,10 @@ uint8_t apu_read(uint16_t addr) {
             data |= 0x01;
         if (apu.pulse2.length_counter > 0)
             data |= 0x02;
-        // TODO(shaw): length counters for triangle and noise channels 
+        if (apu.triangle.length_counter > 0)
+            data |= 0x03;
+
+        // TODO(shaw): length counters for noise channel
 
         if (seq->irq_pending)
             data |= 0x40;
@@ -331,7 +341,31 @@ void apu_write(uint16_t addr, uint8_t data) {
             break;
         }
 
-
+        /* TRIANGLE */
+        case 0x4008:
+        {
+            apu.triangle.linear_control = (data >> 7) & 1;
+            apu.triangle.enabled = !apu.triangle.linear_control;
+            apu.triangle.linear_load = data & 0x7F;
+            break;
+        }
+        case 0x4009: break;
+        case 0x400A:
+        /* triangle freq_timer low */
+        {
+            apu.triangle.freq_timer = (apu.triangle.freq_timer & 0xFF00) | data;
+            break;
+        }
+        case 0x400B:
+        /* triangle freq_timer high and length counter load*/
+        {
+            apu.triangle.freq_timer = (apu.triangle.freq_timer & 0x00FF) | ((data & 0x7) << 8);
+            if (apu.triangle.enabled)
+                apu.triangle.length_counter = length_table[(data >> 3) & 0x1F];
+            apu.triangle.linear_reload_flag = true;
+            break;
+        }
+ 
 
 
         case 0x4015:
@@ -340,14 +374,19 @@ void apu_write(uint16_t addr, uint8_t data) {
             /* TODO(shaw): other channel enable flags */
             bool p1 = (data >> 0) & 1;
             bool p2 = (data >> 1) & 1;
+            bool t  = (data >> 2) & 1;
 
-            apu.pulse1.enabled = p1;
-            apu.pulse2.enabled = p2;
+            apu.pulse1.enabled   = p1;
+            apu.pulse2.enabled   = p2;
+            apu.triangle.enabled = t;
 
             if (!p1)
                 apu.pulse1.length_counter = 0;
             if (!p2)
                 apu.pulse2.length_counter = 0;
+            if (!t)
+                apu.triangle.length_counter = 0;
+
             break;
         }
         case 0x4017:
@@ -390,6 +429,65 @@ static bool should_tick_half_frame(void) {
     return false;
 }
 
+static void tick_quarter_frame(void) {
+    tick_pulse_envelope(&apu.pulse1);
+    tick_pulse_envelope(&apu.pulse2);
+
+    /* tick triangle linear counter */
+    tri_channel_t *tri = &apu.triangle;
+    if (tri->linear_reload_flag)
+        tri->linear_counter = tri->linear_load;
+    else if (tri->linear_counter > 0)
+        --tri->linear_counter;
+
+    if (!tri->linear_control)
+        tri->linear_reload_flag = false;
+}
+
+static void tick_half_frame(void) {
+    /* TODO(shaw): tick sweep units */
+    tick_pulse_sweep(&apu.pulse1, true);
+    tick_pulse_sweep(&apu.pulse2, false);
+
+
+    if (apu.pulse1.enabled && apu.pulse1.length_counter > 0)
+        --apu.pulse1.length_counter;
+    if (apu.pulse2.enabled && apu.pulse2.length_counter > 0)
+        --apu.pulse2.length_counter;
+    if (apu.triangle.enabled && apu.triangle.length_counter > 0)
+        --apu.triangle.length_counter;
+
+    /* TODO(shaw): tick other channel length counters */
+}
+
+static void tick_frame_sequencer(void) {
+    frame_sequencer_t *seq = &apu.frame_sequencer;
+    if (seq->counter > 0) {
+        --seq->counter;
+    } else {
+        if (should_tick_quarter_frame())
+            tick_quarter_frame();
+        if (should_tick_half_frame())
+            tick_half_frame();
+        if (!seq->irq_inhibit && !seq->mode && seq->step == 3)
+            seq->irq_pending = true;
+
+        ++seq->step;
+        seq->step %= seq->mode ? 5 : 4;
+            
+        seq->counter = 7457; /* cpu cycles to next sequence step */
+    }
+}
+
+static void tick_pulse_channel(pulse_channel_t *pulse) {
+    if (pulse->freq_counter > 0) 
+        --pulse->freq_counter;
+    else {
+        pulse->freq_counter = pulse->freq_timer;
+        pulse->duty_counter = (pulse->duty_counter + 1) & 7;
+    }
+}
+
 static void tick_pulse_envelope(pulse_channel_t *pulse) {
     if (pulse->envelope_start) {
         pulse->envelope_start = false;
@@ -408,13 +506,6 @@ static void tick_pulse_envelope(pulse_channel_t *pulse) {
     }
 }
 
-static void tick_quarter_frame(void) {
-    /* tick envelope and triangle linear counter */
-    tick_pulse_envelope(&apu.pulse1);
-    tick_pulse_envelope(&apu.pulse2);
-
-    /* TODO(shaw) tick triangle linear counter */
-}
 
 
 static void tick_pulse_sweep(pulse_channel_t *pulse, bool is_pulse_1) {
@@ -439,37 +530,6 @@ static void tick_pulse_sweep(pulse_channel_t *pulse, bool is_pulse_1) {
     }
 }
 
-static void tick_half_frame(void) {
-    /* TODO(shaw): tick sweep units */
-    tick_pulse_sweep(&apu.pulse1, true);
-    tick_pulse_sweep(&apu.pulse2, false);
-
-    /* TODO(shaw): tick other channel length counters */
-
-    if (apu.pulse1.enabled && apu.pulse1.length_counter > 0)
-        --apu.pulse1.length_counter;
-    if (apu.pulse2.enabled && apu.pulse2.length_counter > 0)
-        --apu.pulse2.length_counter;
-}
-
-static void tick_frame_sequencer(void) {
-    frame_sequencer_t *seq = &apu.frame_sequencer;
-    if (seq->counter > 0) {
-        --seq->counter;
-    } else {
-        if (should_tick_quarter_frame())
-            tick_quarter_frame();
-        if (should_tick_half_frame())
-            tick_half_frame();
-        if (!seq->irq_inhibit && !seq->mode && seq->step == 3)
-            seq->irq_pending = true;
-
-        ++seq->step;
-        seq->step %= seq->mode ? 5 : 4;
-            
-        seq->counter = 7457; /* cpu cycles to next sequence step */
-    }
-}
 
 
 static bool is_sweep_forcing_silence(pulse_channel_t *pulse) {
@@ -504,6 +564,34 @@ static uint8_t pulse_output(pulse_channel_t *pulse) {
     return output;
 }
 
+
+static void tick_triangle_channel(void) {
+    tri_channel_t *tri = &apu.triangle;
+
+    tri->ultrasonic = false;
+    if (tri->freq_timer < 2 && tri->freq_counter == 0)
+        tri->ultrasonic = true;
+    
+   
+    if (tri->length_counter != 0 &&
+        tri->linear_counter != 0 &&
+        !tri->ultrasonic)
+    {
+        if (tri->freq_counter > 0)
+            --tri->freq_counter;
+        else {
+            tri->freq_counter = tri->freq_timer;
+            tri->step = (tri->step + 1) & 0x1F;    // tri->step bound to 00..1F range
+        }
+    }
+}
+
+static uint8_t triangle_output(void) {
+    tri_channel_t *tri = &apu.triangle;
+    if (tri->ultrasonic)       return 7.5;
+    else if (tri->step & 0x10) return tri->step ^ 0x1F;
+    else                       return tri->step;
+}
 
 static void write_sound(float *buffer, int count) {
     int wait_count = 0;
@@ -559,12 +647,13 @@ void apu_tick(void) {
         /* tick DMC */
     }
 
-    /* tick triangle channel */
+    tick_triangle_channel();
 
     tick_frame_sequencer();
 
     pulse1 = pulse_output(&apu.pulse1);
     pulse2 = pulse_output(&apu.pulse2);
+    triangle = triangle_output();
 
     float pulse_out = 0.00752 * (pulse1 + pulse2);
     float tnd_out = 0.00851 * triangle + 0.00494 * noise + 0.00335 * dmc;
