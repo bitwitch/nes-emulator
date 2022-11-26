@@ -88,12 +88,12 @@ int main(int argc, char **argv) {
     bool frame_prepared = false;
     uint64_t elapsed_time = 0;
     uint64_t last_frame_time = get_ticks();
-    emulation_mode_t emulation_mode = EM_STEP_INSTRUCTION;
+    /*emulation_mode_t emulation_mode = EM_STEP_INSTRUCTION;*/
+    emulation_mode_t emulation_mode = EM_RUN;
 
     for (;;) {
         last_platform_state = platform_state;
         do_input();
-
 
 
         /* transfer states */
@@ -108,7 +108,7 @@ int main(int argc, char **argv) {
         case EM_RUN:
         {
             /* update */
-            if (!frame_prepared) {
+            if (apu_request_frame()) {
                 while (!ppu_frame_completed()) {
                     if (cpu.op_cycles == 0 && ppu_nmi())  {
                         cpu_nmi(&cpu);
@@ -117,10 +117,10 @@ int main(int argc, char **argv) {
                     cpu_tick(&cpu);
                     apu_tick();
                     ppu_tick(); ppu_tick(); ppu_tick();
-                    
                 }
                 
                 ppu_clear_frame_completed();
+                apu_flush_sound_buffer();
                 frame_prepared = true;
 
                 update_pattern_tables(0, pattern_tables);
@@ -167,6 +167,7 @@ int main(int argc, char **argv) {
 
                 if (ppu_frame_completed()) {
                     ppu_clear_frame_completed();
+                    apu_flush_sound_buffer();
                 }
                 update_pattern_tables(0, pattern_tables);
                 update_palettes(palettes);
@@ -206,6 +207,7 @@ int main(int argc, char **argv) {
                 }
                 
                 ppu_clear_frame_completed();
+                apu_flush_sound_buffer();
                 frame_prepared = true;
 
                 update_pattern_tables(0, pattern_tables);
