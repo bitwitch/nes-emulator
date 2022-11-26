@@ -70,6 +70,5 @@ void set_font_color(uint32_t color);
 void render_text(char *text, int x, int y);
 void render_text_color(char *text, int x, int y, uint32_t color_mod);
 
-void render_sound_wave(float *audio_buffer, int len);
 
 #endif
