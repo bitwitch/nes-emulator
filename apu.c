@@ -13,7 +13,7 @@ typedef struct {
     uint8_t loop            : 1;
     uint8_t constant_volume : 1;
     uint8_t envelope        : 4;
-} pulse_register_t;
+} channel_register_t;
 
 typedef struct {
     uint8_t enabled     : 1;
@@ -23,7 +23,7 @@ typedef struct {
 } sweep_register_t;
 
 typedef struct {
-    pulse_register_t reg;
+    channel_register_t reg;
     sweep_register_t sweep;
     uint8_t length_counter;
     bool envelope_start; 
@@ -50,6 +50,21 @@ typedef struct {
     uint8_t step;
 } tri_channel_t;
 
+
+typedef struct {
+    channel_register_t reg;
+    uint8_t length_counter;
+    uint8_t envelope_counter; 
+    uint8_t envelope_current_volume; 
+    uint16_t freq_timer;
+    uint16_t freq_counter;
+    uint16_t shift_reg;
+    bool enabled;
+    bool shift_mode;
+    bool envelope_start; 
+} noise_channel_t;
+
+
 typedef struct {
     /*divider;*/
     /*sequencer;*/
@@ -68,6 +83,7 @@ typedef struct {
     SDL_AudioDeviceID audio_device;
     pulse_channel_t pulse1, pulse2;
     tri_channel_t triangle;
+    noise_channel_t noise;
     frame_sequencer_t frame_sequencer;
 } apu_t;
 
@@ -96,9 +112,13 @@ static void tick_pulse_channel(pulse_channel_t *pulse);
 static void tick_pulse_envelope(pulse_channel_t *pulse);
 static void tick_pulse_sweep(pulse_channel_t *pulse, bool is_pulse_2);
 static void tick_triangle_channel(void);
+static void tick_noise_channel(void);
+static void tick_noise_envelope(noise_channel_t *noise);
 static void tick_frame_sequencer(void);
 static bool is_sweep_forcing_silence(pulse_channel_t *pulse);
 static uint8_t pulse_output(pulse_channel_t *pulse);
+static uint8_t triangle_output(void);
+static uint8_t noise_output(void);
 
 static apu_t apu;
 /*static uint64_t samples_played;*/
@@ -131,6 +151,9 @@ double pulse_lookup_table[31] = { 0, 0.011609139523578026, 0.022939481268011527,
 double tnd_lookup_table[203] = {0};
 
 uint8_t length_table[32] = {10, 254, 20, 2, 40, 4, 80, 6, 160, 8, 60, 10, 14, 12, 26, 14, 12, 16, 24, 18, 48, 20, 96, 22, 192, 24, 72, 26, 16, 28, 32, 30 };
+
+uint16_t noise_freq_table[16] = {4, 8, 16, 32, 64, 96, 128, 160, 202, 254, 380, 508, 762, 1016, 2034, 4068};
+
 
 /*
  * The callback must completely initialize the buffer; as of SDL 2.0, this
@@ -229,6 +252,10 @@ void apu_init(void) {
         }
         SDL_PauseAudioDevice(apu.audio_device, 0);
     }
+
+    // noise shift register must never be zero or the noise channel will never produce any output
+    apu.noise.shift_reg = 1;
+
 }
 
 uint8_t apu_read(uint16_t addr) {
@@ -242,8 +269,10 @@ uint8_t apu_read(uint16_t addr) {
             data |= 0x02;
         if (apu.triangle.length_counter > 0)
             data |= 0x03;
+        if (apu.noise.length_counter > 0)
+            data |= 0x04;
 
-        // TODO(shaw): length counters for noise channel
+        // TODO(shaw): DMC stuff
 
         if (seq->irq_pending)
             data |= 0x40;
@@ -262,7 +291,7 @@ void apu_write(uint16_t addr, uint8_t data) {
         case 0x4000:
         /* pulse1 volume */
         {
-            pulse_register_t *reg = &apu.pulse1.reg;
+            channel_register_t *reg = &apu.pulse1.reg;
             reg->duty            = (data >> 6) & 0x3;
             reg->loop            = (data >> 5) & 0x1;
             reg->constant_volume = (data >> 4) & 0x1;
@@ -304,7 +333,7 @@ void apu_write(uint16_t addr, uint8_t data) {
         case 0x4004:
         /* pulse2 volume */
         {
-            pulse_register_t *reg = &apu.pulse2.reg;
+            channel_register_t *reg = &apu.pulse2.reg;
             reg->duty            = (data >> 6) & 0x3;
             reg->loop            = (data >> 5) & 0x1;
             reg->constant_volume = (data >> 4) & 0x1;
@@ -366,19 +395,45 @@ void apu_write(uint16_t addr, uint8_t data) {
             break;
         }
  
+        /* NOISE */
+        case 0x400C:
+        {
+            channel_register_t *reg = &apu.noise.reg;
+            reg->loop            = (data >> 5) & 0x1;
+            reg->constant_volume = (data >> 4) & 0x1;
+            reg->envelope        = (data >> 0) & 0xF;
+            break;
+        }
+        case 0x400D: break;
+        case 0x400E:
+        {
+
+            apu.noise.freq_timer = noise_freq_table[data & 0xF];
+            apu.noise.shift_mode = (data >> 7) & 1;
+            break;
+        }
+        case 0x400F:
+        {
+            if (apu.noise.enabled)
+                apu.noise.length_counter = length_table[(data >> 3) & 0x1F];
+            apu.noise.envelope_start = true;
+            break;
+        }
 
 
         case 0x4015:
         /* status register */
         {
-            /* TODO(shaw): other channel enable flags */
+            /* TODO(shaw): DMC stuff */
             bool p1 = (data >> 0) & 1;
             bool p2 = (data >> 1) & 1;
             bool t  = (data >> 2) & 1;
+            bool n  = (data >> 3) & 1;
 
             apu.pulse1.enabled   = p1;
             apu.pulse2.enabled   = p2;
             apu.triangle.enabled = t;
+            apu.noise.enabled = n;
 
             if (!p1)
                 apu.pulse1.length_counter = 0;
@@ -386,6 +441,8 @@ void apu_write(uint16_t addr, uint8_t data) {
                 apu.pulse2.length_counter = 0;
             if (!t)
                 apu.triangle.length_counter = 0;
+            if (!n)
+                apu.noise.length_counter = 0;
 
             break;
         }
@@ -433,6 +490,8 @@ static void tick_quarter_frame(void) {
     tick_pulse_envelope(&apu.pulse1);
     tick_pulse_envelope(&apu.pulse2);
 
+    tick_noise_envelope(&apu.noise);
+
     /* tick triangle linear counter */
     tri_channel_t *tri = &apu.triangle;
     if (tri->linear_reload_flag)
@@ -445,10 +504,8 @@ static void tick_quarter_frame(void) {
 }
 
 static void tick_half_frame(void) {
-    /* TODO(shaw): tick sweep units */
     tick_pulse_sweep(&apu.pulse1, true);
     tick_pulse_sweep(&apu.pulse2, false);
-
 
     if (apu.pulse1.enabled && apu.pulse1.length_counter > 0)
         --apu.pulse1.length_counter;
@@ -456,6 +513,8 @@ static void tick_half_frame(void) {
         --apu.pulse2.length_counter;
     if (apu.triangle.enabled && apu.triangle.length_counter > 0)
         --apu.triangle.length_counter;
+    if (apu.noise.enabled && apu.noise.length_counter > 0)
+        --apu.noise.length_counter;
 
     /* TODO(shaw): tick other channel length counters */
 }
@@ -506,6 +565,23 @@ static void tick_pulse_envelope(pulse_channel_t *pulse) {
     }
 }
 
+static void tick_noise_envelope(noise_channel_t *noise) {
+    if (noise->envelope_start) {
+        noise->envelope_start = false;
+        noise->envelope_current_volume = 0xF;
+        noise->envelope_counter = noise->reg.envelope;
+    } else {
+        if (noise->envelope_counter > 0)
+            --noise->envelope_counter;
+        else {
+            noise->envelope_counter = noise->reg.envelope;
+            if (noise->envelope_current_volume > 0)
+                --noise->envelope_current_volume;
+            else if (noise->reg.loop)
+                noise->envelope_current_volume = 0xF;
+        }
+    }
+}
 
 
 static void tick_pulse_sweep(pulse_channel_t *pulse, bool is_pulse_1) {
@@ -593,6 +669,35 @@ static uint8_t triangle_output(void) {
     else                       return tri->step;
 }
 
+static void tick_noise_channel(void) {
+    noise_channel_t *n = &apu.noise;
+    if (n->freq_counter > 0)
+        --n->freq_counter;
+    else {
+        n->freq_counter = n->freq_timer;
+        uint8_t xor_bit = n->shift_mode ? 6 : 1;
+        uint8_t feedback_bit = ((n->shift_reg >> xor_bit) & 1) ^ (n->shift_reg & 1);
+
+        // set bit 15 to feedback bit
+        n->shift_reg = (n->shift_reg & ~0x8000) | (feedback_bit << 15);
+
+        n->shift_reg >>= 1;
+    }
+}
+
+static uint8_t noise_output(void) {
+    uint8_t output = 0;
+    noise_channel_t *noise = &apu.noise;
+    if ((noise->shift_reg & 1) == 0 && noise->length_counter != 0) {
+        if(noise->reg.constant_volume) 
+            output = noise->reg.envelope;
+        else
+            output = noise->envelope_current_volume;
+    }
+    return output;
+}
+
+
 static void write_sound(float *buffer, int count) {
     int wait_count = 0;
     while (count) {
@@ -642,7 +747,7 @@ void apu_tick(void) {
         tick_pulse_channel(&apu.pulse1);
         tick_pulse_channel(&apu.pulse2);
 
-        /* tick noise channel */
+        tick_noise_channel();
 
         /* tick DMC */
     }
@@ -654,6 +759,7 @@ void apu_tick(void) {
     pulse1 = pulse_output(&apu.pulse1);
     pulse2 = pulse_output(&apu.pulse2);
     triangle = triangle_output();
+    noise = noise_output();
 
     float pulse_out = 0.00752 * (pulse1 + pulse2);
     float tnd_out = 0.00851 * triangle + 0.00494 * noise + 0.00335 * dmc;
