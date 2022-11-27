@@ -867,9 +867,9 @@ void apu_tick(void) {
 
     pulse1   = pulse_output(&apu.pulse1);
     pulse2   = pulse_output(&apu.pulse2);
-    /*triangle = triangle_output();*/
-    /*noise    = noise_output();*/
-    /*dmc      = apu.dmc.output;*/
+    triangle = triangle_output();
+    noise    = noise_output();
+    dmc      = apu.dmc.output;
 
     float pulse_out = 0.00752 * (pulse1 + pulse2);
     float tnd_out = 0.00851 * triangle + 0.00494 * noise + 0.00335 * dmc;
