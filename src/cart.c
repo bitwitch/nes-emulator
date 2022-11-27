@@ -135,9 +135,11 @@ uint8_t cart_cpu_read(uint16_t addr) {
 
     if (addr < 0x4020)
         assert(0 && "cpu should only access cartridge from 0x4020-0xFFFF");
-    else if (addr < 0x6000)
-        assert(0 && "this part of cart memory not implemented");
-    else if (addr < 0x8000) /* $6000 - $7FFF */
+    else if (addr < 0x6000) {
+        // NOTE(shaw): currently ignoring 0x4020 - 0x5FFF, but some mappers use this address space
+        // https://www.nesdev.org/wiki/Category:Mappers_using_$4020-$5FFF
+        return 0;
+    } else if (addr < 0x8000) /* $6000 - $7FFF */
         return cart.prg_ram[mapped_addr];
     else {
         /*printf("addr=0x%4X mapped_addr=0x%4X\n", addr, mapped_addr);*/
@@ -150,9 +152,10 @@ void cart_cpu_write(uint16_t addr, uint8_t data) {
 
     if (addr < 0x4020) 
         assert(0 && "cpu should only access cartridge from 0x4020-0xFFFF");
-    else if (addr < 0x6000)
-        assert(0 && "this part of cart memory not implemented");
-    else if (addr < 0x8000) /* $6000 - $7FFF */
+    else if (addr < 0x6000) {
+        // NOTE(shaw): currently ignoring 0x4020 - 0x5FFF, but some mappers use this address space
+        // https://www.nesdev.org/wiki/Category:Mappers_using_$4020-$5FFF
+    } else if (addr < 0x8000) /* $6000 - $7FFF */
         cart.prg_ram[mapped_addr] = data;
 
 
@@ -167,6 +170,7 @@ void cart_cpu_write(uint16_t addr, uint8_t data) {
 
 uint8_t cart_ppu_read(uint16_t addr, uint8_t vram[2048]) {
     uint32_t mapped_addr = mapper_read(cart.mapper, addr);
+
     return addr < 0x2000
         ? cart.chr_rom[mapped_addr]
         : vram[mapped_addr];
@@ -174,6 +178,7 @@ uint8_t cart_ppu_read(uint16_t addr, uint8_t vram[2048]) {
 
 void cart_ppu_write(uint16_t addr, uint8_t data, uint8_t vram[2048]) {
     uint32_t mapped_addr = mapper_write(cart.mapper, addr, data);
+
     if (addr < 0x2000)
         cart.chr_rom[mapped_addr] = data;
     else 
