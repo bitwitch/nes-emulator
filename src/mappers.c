@@ -116,6 +116,8 @@ mapper2_write(mapper_t *head, uint16_t addr, uint8_t data) {
     return mapper2_map_addr(head, addr);
 }
 
+
+
 /***************************************************************************** 
  * MAPPER 3 
  ****************************************************************************/
@@ -130,7 +132,9 @@ mapper3_map_addr(mapper_t *head, uint16_t addr) {
 
     if (addr < 0x2000) {
         // ppu bank switchable chr rom
-        return addr + (mapper->bank * _8KB);
+        // NOTE(shaw): banks not used by the cartridge are mirrored over banks
+        // that are used
+        return addr + ((mapper->bank % head->chr_banks) * _8KB);
     }
 
     /* horizontal and vertical nametable mirroring */
@@ -182,19 +186,19 @@ mapper_t *make_mapper(uint16_t mapper_id, uint8_t prg_banks, uint8_t chr_banks, 
     switch(mapper_id) {
         case 0:
         {
-            mapper0_t *mapper0 = malloc(sizeof(mapper0_t));
+            mapper0_t *mapper0 = calloc(1, sizeof(mapper0_t));
             mapper = (mapper_t *)mapper0;
             break;
         }
         case 2:
         {
-            mapper2_t *mapper2 = malloc(sizeof(mapper2_t));
+            mapper2_t *mapper2 = calloc(1, sizeof(mapper2_t));
             mapper = (mapper_t *)mapper2;
             break;
         }
         case 3:
         {
-            mapper3_t *mapper3 = malloc(sizeof(mapper3_t));
+            mapper3_t *mapper3 = calloc(1, sizeof(mapper3_t));
             mapper = (mapper_t *)mapper3;
             break;
         }
