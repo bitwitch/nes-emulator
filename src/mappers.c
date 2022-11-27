@@ -14,6 +14,7 @@
  */
 
 #include "mappers.h"
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -63,6 +64,162 @@ mapper0_write(mapper_t *head, uint16_t addr, uint8_t data) {
     (void)data;
     return mapper0_map_addr(head, addr);
 }
+
+/***************************************************************************** 
+ * MAPPER 1 
+ ****************************************************************************/
+typedef struct {
+    mapper_t head;
+    uint8_t shift_reg;
+    uint8_t control; 
+    uint8_t chr_bank0;
+    uint8_t chr_bank1;
+    uint8_t prg_bank;
+} mapper1_t;
+
+static uint32_t
+mapper1_map_addr(mapper_t *head, uint16_t addr) {
+    mapper1_t *mapper = (mapper1_t *)head;
+
+    if (addr < 0x2000) { 
+        // CHR ROM bank mode
+        if ((mapper->control >> 4) & 1) {
+        //switch two separate 4KB banks
+            if (addr < 0x1000)
+                return addr + mapper->chr_bank0 * _4KB;
+            else 
+                return (addr - 0x1000) + mapper->chr_bank1 * _4KB; // TODO(shaw): make sure this is correct
+        } else {
+        //switch 8KB at a time
+            return addr + mapper->chr_bank0 * _8KB;
+        }
+    }
+
+    // nametable mirroring
+    else if (addr < 0x3F00) {
+        uint32_t mapped_addr = (addr & 0x2FFF) - 0x2000;
+        uint8_t mirror_mode = mapper->control & 0x3;
+
+        switch (mirror_mode) {
+        case 0: // one-screen, lower bank
+            return mapped_addr & 0x03FF;
+        case 1: // one-screen, upper bank
+            return (mapped_addr & 0x03FF) + 0x0400;
+        case 2: // vertical
+            return mapped_addr & 0x07FF;
+        case 3: // horizontal
+            return mapped_addr < 0x0800
+                ? mapped_addr & 0x03FF
+                : ((mapped_addr-0x0800) & 0x03FF) + 0x0400;
+        default:
+            assert(0 && "unknown mirror mode");
+            break;
+        }
+    } 
+
+    else if (addr < 0x6000) 
+        return addr;
+    else if (addr < 0x8000)   /* $6000 - $7FFF */
+        return addr - 0x6000;
+
+    // first 16KB bank (or 32KB if in that mode)
+    else if (addr < 0xC000) { /* $8000 - $BFFF */
+        uint8_t prg_bank_mode = (mapper->control >> 2) & 0x3;
+        switch (prg_bank_mode) {
+            case 0:
+            case 1: // switch 32 KB at $8000, ignoring low bit of bank number
+            {
+                uint8_t prg_bank = mapper->prg_bank & 0x0F;
+                return (addr - 0x8000) + (prg_bank * _32KB);
+            }
+            case 2: // fix first bank at $8000 
+                return (addr - 0x8000);
+            case 3: // switch 16 KB bank at $8000
+            {
+                uint8_t prg_bank = mapper->prg_bank & 0x0F;
+                return (addr - 0x8000) + (prg_bank * _16KB);
+            }
+            default:
+                assert(0 && "unknown prg_bank_mode");
+                break;
+        }
+    }
+
+    // second 16KB bank (or 32KB if in that mode)
+    else { /* $C000 - $FFFF */
+        uint8_t prg_bank_mode = (mapper->control >> 2) & 0x3;
+        switch (prg_bank_mode) {
+            case 0:
+            case 1: // switch 32 KB at $8000, ignoring low bit of bank number
+            {
+                uint8_t prg_bank = mapper->prg_bank & 0x0F;
+                return (addr - 0x8000) + (prg_bank * _32KB);
+            }
+            case 2: // switch 16 KB bank at $C000
+            {
+                uint8_t prg_bank = mapper->prg_bank & 0x0F;
+                return (addr - 0xC000) + (prg_bank * _16KB);
+            }
+            case 3: // fix last bank at $C000
+                return (addr - 0xC000) + ((head->prg_banks-1) * _16KB);
+            default:
+                assert(0 && "unknown prg_bank_mode");
+                break;
+        }
+    }
+}
+
+static uint32_t 
+mapper1_read(mapper_t *head, uint16_t addr) {
+    return mapper1_map_addr(head, addr);
+}
+
+static uint32_t 
+mapper1_write(mapper_t *head, uint16_t addr, uint8_t data) {
+    static uint8_t shift_count = 0;
+    if (addr >= 0x8000) {
+        mapper1_t *mapper = (mapper1_t *)head;
+
+        if ((data >> 7) & 1) {
+            // clear shift register to its initial state
+            mapper->shift_reg = 0;
+            shift_count = 0;
+
+            // set 16k PRG mode, $8000 swappable
+            // NOTE(shaw): Disch includes this in his mapper notes, but I can't
+            // find it on the nesdev wiki anywhere. I am inclined to believe
+            // Disch though.
+            // https://www.romhacking.net/download/documents/362/
+            mapper->control |= 0xC;
+        } else {
+            // shift bit 0 of data into shift register
+            mapper->shift_reg = (mapper->shift_reg & 0x1F) | ((data & 1) << 5);
+            mapper->shift_reg >>= 1;
+            ++shift_count;
+
+            // on fifth write, copy to an internal register
+            if (shift_count == 5) {
+
+                if (addr < 0xA000) {         // $8000 - $9FFF
+                    mapper->control = mapper->shift_reg;
+                } else if (addr < 0xC000) {  // $A000 - $BFFF
+                    mapper->chr_bank0 = mapper->shift_reg;
+                } else if (addr < 0xE000) {  // $C000 - $DFFF
+                    mapper->chr_bank1 = mapper->shift_reg;
+                } else {                     // $E000 - $FFFF
+                    mapper->prg_bank = mapper->shift_reg;
+                }
+
+                mapper->shift_reg = 0;
+                shift_count = 0;
+            }
+        }
+    }
+
+    return mapper1_map_addr(head, addr);
+}
+
+
 
 
 /***************************************************************************** 
@@ -190,6 +347,12 @@ mapper_t *make_mapper(uint16_t mapper_id, uint8_t prg_banks, uint8_t chr_banks, 
             mapper = (mapper_t *)mapper0;
             break;
         }
+        case 1:
+        {
+            mapper1_t *mapper1 = calloc(1, sizeof(mapper1_t));
+            mapper = (mapper_t *)mapper1;
+            break;
+        }
         case 2:
         {
             mapper2_t *mapper2 = calloc(1, sizeof(mapper2_t));
@@ -220,6 +383,7 @@ mapper_t *make_mapper(uint16_t mapper_id, uint8_t prg_banks, uint8_t chr_banks, 
 uint32_t mapper_read(mapper_t *mapper, uint16_t addr) {
     switch (mapper->id) {
         case 0: return mapper0_read(mapper, addr);
+        case 1: return mapper1_read(mapper, addr);
         case 2: return mapper2_read(mapper, addr);
         case 3: return mapper3_read(mapper, addr);
         default:
@@ -232,6 +396,7 @@ uint32_t mapper_read(mapper_t *mapper, uint16_t addr) {
 uint32_t mapper_write(mapper_t *mapper, uint16_t addr, uint8_t data) {
     switch (mapper->id) {
         case 0: return mapper0_write(mapper, addr, data);
+        case 1: return mapper1_write(mapper, addr, data);
         case 2: return mapper2_write(mapper, addr, data);
         case 3: return mapper3_write(mapper, addr, data);
         default:

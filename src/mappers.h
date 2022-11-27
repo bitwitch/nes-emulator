@@ -6,8 +6,10 @@
 
 #define MAPPER_MIRROR_HORIZ    0
 #define MAPPER_MIRROR_VERT     1
+#define _4KB                   4096
 #define _8KB                   8192
 #define _16KB                  16384
+#define _32KB                  32768
 
 typedef struct {
     uint8_t prg_banks;    /* number of 16KB prg rom banks */
