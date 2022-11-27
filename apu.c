@@ -7,6 +7,8 @@
 #include <SDL2/SDL_audio.h>
 #include "io.h"
 
+uint8_t bus_read(uint16_t addr); // from bus.h but have to avoid cyclic dependency
+
 
 typedef struct {
     uint8_t duty            : 2;
@@ -50,7 +52,6 @@ typedef struct {
     uint8_t step;
 } tri_channel_t;
 
-
 typedef struct {
     channel_register_t reg;
     uint8_t length_counter;
@@ -63,6 +64,26 @@ typedef struct {
     bool shift_mode;
     bool envelope_start; 
 } noise_channel_t;
+
+typedef struct {
+    bool enabled;
+    bool irq_enabled;
+    bool irq_pending;
+    bool loop;
+    bool output_silent;
+    bool sample_buffer_empty;
+    uint8_t sample_buffer;
+    uint8_t output;
+    uint8_t output_shift;
+    uint8_t output_bits;
+    uint16_t sample_addr;
+    uint16_t sample_length;
+    uint16_t sample_addr_load;
+    uint16_t sample_length_load;
+    uint16_t freq_timer;
+    uint16_t freq_counter;
+    
+} dmc_channel_t;  // delta modulation channel
 
 
 typedef struct {
@@ -84,6 +105,7 @@ typedef struct {
     pulse_channel_t pulse1, pulse2;
     tri_channel_t triangle;
     noise_channel_t noise;
+    dmc_channel_t dmc;
     frame_sequencer_t frame_sequencer;
 } apu_t;
 
@@ -114,6 +136,7 @@ static void tick_pulse_sweep(pulse_channel_t *pulse, bool is_pulse_2);
 static void tick_triangle_channel(void);
 static void tick_noise_channel(void);
 static void tick_noise_envelope(noise_channel_t *noise);
+static void tick_dmc_channel(void);
 static void tick_frame_sequencer(void);
 static bool is_sweep_forcing_silence(pulse_channel_t *pulse);
 static uint8_t pulse_output(pulse_channel_t *pulse);
@@ -150,9 +173,11 @@ double pulse_lookup_table[31] = { 0, 0.011609139523578026, 0.022939481268011527,
 
 double tnd_lookup_table[203] = {0};
 
-uint8_t length_table[32] = {10, 254, 20, 2, 40, 4, 80, 6, 160, 8, 60, 10, 14, 12, 26, 14, 12, 16, 24, 18, 48, 20, 96, 22, 192, 24, 72, 26, 16, 28, 32, 30 };
+static uint8_t length_table[32] = {10, 254, 20, 2, 40, 4, 80, 6, 160, 8, 60, 10, 14, 12, 26, 14, 12, 16, 24, 18, 48, 20, 96, 22, 192, 24, 72, 26, 16, 28, 32, 30 };
 
-uint16_t noise_freq_table[16] = {4, 8, 16, 32, 64, 96, 128, 160, 202, 254, 380, 508, 762, 1016, 2034, 4068};
+static uint16_t noise_freq_table[16] = {4, 8, 16, 32, 64, 96, 128, 160, 202, 254, 380, 508, 762, 1016, 2034, 4068};
+
+static uint16_t dmc_freq_table[16] = {428, 380, 340, 320, 286, 254, 226, 214, 190, 160, 142, 128, 106,  84,  72,  54};
 
 
 /*
@@ -268,15 +293,17 @@ uint8_t apu_read(uint16_t addr) {
         if (apu.pulse2.length_counter > 0)
             data |= 0x02;
         if (apu.triangle.length_counter > 0)
-            data |= 0x03;
-        if (apu.noise.length_counter > 0)
             data |= 0x04;
-
-        // TODO(shaw): DMC stuff
+        if (apu.noise.length_counter > 0)
+            data |= 0x08;
+        if (apu.dmc.sample_length > 0)
+            data |= 0x10;
+        if (apu.dmc.irq_pending > 0)
+            data |= 0x80;
 
         if (seq->irq_pending)
             data |= 0x40;
-        
+
         seq->irq_pending = false;
 
         return data;
@@ -420,15 +447,42 @@ void apu_write(uint16_t addr, uint8_t data) {
             break;
         }
 
-
-        case 0x4015:
-        /* status register */
+        /* DMC */
+        case 0x4010:
         {
-            /* TODO(shaw): DMC stuff */
-            bool p1 = (data >> 0) & 1;
-            bool p2 = (data >> 1) & 1;
-            bool t  = (data >> 2) & 1;
-            bool n  = (data >> 3) & 1;
+            apu.dmc.irq_enabled = (data >> 7) & 1;
+            apu.dmc.loop = (data >> 6) & 1;
+            apu.dmc.freq_timer = dmc_freq_table[data & 0xF];
+            if (!apu.dmc.irq_enabled)
+                apu.dmc.irq_pending = false;
+            break;
+        }
+        case 0x4011:
+        {
+            apu.dmc.output = data & 0x7F;
+            break;
+        }
+        case 0x4012:
+        {
+            apu.dmc.sample_addr_load = 0xC000 + (data << 6);
+            break;
+        }
+        case 0x4013:
+        {
+            apu.dmc.sample_length_load = (data << 4) + 1;
+            break;
+        }
+
+
+
+        /* status register */
+        case 0x4015:
+        {
+            bool p1  = (data >> 0) & 1;
+            bool p2  = (data >> 1) & 1;
+            bool t   = (data >> 2) & 1;
+            bool n   = (data >> 3) & 1;
+            bool dmc = (data >> 4) & 1;
 
             apu.pulse1.enabled   = p1;
             apu.pulse2.enabled   = p2;
@@ -444,6 +498,17 @@ void apu_write(uint16_t addr, uint8_t data) {
             if (!n)
                 apu.noise.length_counter = 0;
 
+            if (dmc) {
+                if (apu.dmc.sample_length == 0) {
+                    apu.dmc.sample_length = apu.dmc.sample_length_load;
+                    apu.dmc.sample_addr = apu.dmc.sample_addr_load;
+                }
+            } 
+            else
+                apu.dmc.sample_length = 0;
+
+            apu.dmc.irq_pending = false; // acknowledge DMC IRQ on write
+                                         //
             break;
         }
         case 0x4017:
@@ -697,6 +762,55 @@ static uint8_t noise_output(void) {
     return output;
 }
 
+static void tick_dmc_channel(void) {
+    dmc_channel_t *dmc = &apu.dmc;
+    if (dmc->freq_counter > 0)
+        --dmc->freq_counter;
+    else {
+        dmc->freq_counter = dmc->freq_timer;
+
+        if (!dmc->output_silent) {
+            if ((dmc->output_shift & 1) && dmc->output < 0x7E)
+                dmc->output += 2;
+            if (!(dmc->output_shift & 1) && dmc->output > 0x01)
+                dmc->output -= 2;
+        }
+
+        --dmc->output_bits;
+        dmc->output_shift >>= 1;
+
+        if (dmc->output_bits == 0) {
+            dmc->output_bits = 8;
+            dmc->output_shift = dmc->sample_buffer;
+            dmc->output_silent = dmc->sample_buffer_empty;
+            dmc->sample_buffer_empty = true;
+        }
+    }
+
+
+
+    // perform DMA if necessary
+    if (dmc->sample_length > 0 && dmc->sample_buffer_empty) {
+
+        // NOTE(shaw): this causes some cpu cycle delays, but I am ignoring them here
+        // see: https://www.nesdev.org/wiki/APU_DMC
+        dmc->sample_buffer = bus_read(dmc->sample_addr);
+
+        dmc->sample_buffer_empty = false;
+        dmc->sample_addr = (dmc->sample_addr + 1) | 0x8000;     // wrap $FFFF to $8000
+        --dmc->sample_length;
+
+        if (dmc->sample_length == 0) {
+            if (dmc->loop) {
+                dmc->sample_length = dmc->sample_length_load;
+                dmc->sample_addr = dmc->sample_addr_load;
+            }
+            else if (dmc->irq_enabled)
+                dmc->irq_pending = true;
+        }
+    }
+
+}
 
 static void write_sound(float *buffer, int count) {
     int wait_count = 0;
@@ -749,17 +863,18 @@ void apu_tick(void) {
 
         tick_noise_channel();
 
-        /* tick DMC */
+        tick_dmc_channel();
     }
 
     tick_triangle_channel();
 
     tick_frame_sequencer();
 
-    pulse1 = pulse_output(&apu.pulse1);
-    pulse2 = pulse_output(&apu.pulse2);
+    pulse1   = pulse_output(&apu.pulse1);
+    pulse2   = pulse_output(&apu.pulse2);
     triangle = triangle_output();
-    noise = noise_output();
+    noise    = noise_output();
+    dmc      = apu.dmc.output;
 
     float pulse_out = 0.00752 * (pulse1 + pulse2);
     float tnd_out = 0.00851 * triangle + 0.00494 * noise + 0.00335 * dmc;
