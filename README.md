@@ -12,6 +12,19 @@ Linux installation instructions [here](http://wiki.libsdl.org/Installation#linux
 1. run `make`  
 2. run `./nes <path_to_game_rom>`  
 
+## Windows
+1. Install mingw-w64  
+  - You can find the specific version you want from [here](https://sourceforge.net/projects/mingw-w64/files/).  
+  - The verision I used was version 8.1.0, [x86_64-posix-seh](https://sourceforge.net/projects/mingw-w64/files/Toolchains%20targetting%20Win64/Personal%20Builds/mingw-builds/8.1.0/threads-posix/seh/x86_64-8.1.0-release-posix-seh-rt_v6-rev0.7z)  
+  - Add the mingw-w64 bin directory to your path environment variable, so that you can use gcc   
+  - You can find more details about setting up SDL2 with mingw-w64 [here](https://www.matsson.com/prog/sdl2-mingw-w64-tutorial.php).  
+2. Install SDL2  
+  - Download the [mingw-w64 development libraries](https://www.libsdl.org/release/SDL2-devel-2.0.20-mingw.tar.gz)  
+  - After extracting the contents, copy the directory `x86_64-w64-mingw32` to a  
+    directory called `SDL2` in this project    
+3. run `build`   
+4. run `nes<path_to_game_rom>`   
+
 #### References:
 http://6502.org  
 https://www.nesdev.org/wiki/Nesdev_Wiki  

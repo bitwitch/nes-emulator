@@ -1,12 +1,12 @@
-CC=gcc
-#CFLAGS=-Wall -Wextra -pedantic -D_GNU_SOURCE -O2 $(shell sdl2-config --cflags --libs)
-CFLAGS=-Wall -Wextra -pedantic -Og -g $(shell sdl2-config --cflags --libs)
-LFLAGS := -L/usr/local/lib -lm
+CC      := gcc CFLAGS  := -Wall -Wextra -pedantic -Og -g -I./src $(shell
+sdl2-config --cflags) LFLAGS  := -L/usr/local/lib -lm $(shell sdl2-config
+--libs) SOURCES := $(wildcard src/*.c) SOURCES := $(filter-out src/repl.c,
+$(SOURCES))
 
 .PHONY: nes
 
-nes: main.c bus.c cpu_6502.c cart.c io.c ppu.c mappers.c apu.c
-	$(CC) -o nes main.c bus.c cpu_6502.c cart.c io.c ppu.c mappers.c apu.c $(LFLAGS) $(CFLAGS) 
+nes: 
+	$(CC) -o nes $(SOURCES) $(CFLAGS) $(LFLAGS)
 
 debug: CFLAGS += -DDEBUG_LOG
 debug: nes
