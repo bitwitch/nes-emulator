@@ -3,7 +3,7 @@ mkdir .\build-windows
 pushd .\build-windows
 
 xcopy /D ..\SDL2\bin\SDL2.dll .\SDL2.dll
-xcopy /E /I /D ..\assets .\assets
+xcopy /E /I /D ..\font.png .
 
 setlocal EnableDelayedExpansion
 setlocal EnableExtensions

@@ -2,3 +2,5 @@ references.txt
 notes.txt
 tags
 nes
+SDL2
+build-windows
