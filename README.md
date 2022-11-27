@@ -1,7 +1,9 @@
 # NES Emulator
 I grew up playing the NES so I really love this system. I learned most of what  
 I know about the NES from the [nesdev wiki](https://www.nesdev.org/wiki/Nesdev_Wiki), the contributors who compiled that  
-information are amazing.  
+information are amazing. Special thanks to Disch [RIP] who wrote many answers  
+in the nesdev forums to questions about the APU. They helped me immensely when  
+trying to figure out audio, even so many years after he wrote them.  
 
 ## Dependencies
 [SDL2](https://www.libsdl.org/download-2.0.php)  
