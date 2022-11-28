@@ -227,7 +227,7 @@ mapper1_write(mapper_t *head, uint16_t addr, uint8_t data) {
  ****************************************************************************/
 typedef struct {
     mapper_t head;
-    uint8_t bank;
+    uint8_t prg_bank; // mapper2 has up to 4096K of bank switchable prg rom
 } mapper2_t;
 
 static uint32_t
@@ -253,7 +253,7 @@ mapper2_map_addr(mapper_t *head, uint16_t addr) {
     else if (addr < 0x8000) /* $6000 - $7FFF */
         return addr - 0x6000;
     else if (addr < 0xC000) /* $8000 - $BFFF */
-        return (addr - 0x8000) + (mapper->bank * _16KB);
+        return (addr - 0x8000) + (mapper->prg_bank * _16KB);
     else                    /* $C000 - $FFFF */
         /* fixed to the last bank */
         return (addr - 0xC000) + ((head->prg_banks-1) * _16KB);
@@ -268,7 +268,7 @@ static uint32_t
 mapper2_write(mapper_t *head, uint16_t addr, uint8_t data) {
     if (addr >= 0x8000) {
         mapper2_t *mapper = (mapper2_t *)head;
-        mapper->bank = data;
+        mapper->prg_bank = data;
     }
     return mapper2_map_addr(head, addr);
 }
@@ -280,7 +280,7 @@ mapper2_write(mapper_t *head, uint16_t addr, uint8_t data) {
  ****************************************************************************/
 typedef struct {
     mapper_t head;
-    uint8_t bank; // mapper 3 has up to 2048KiB of bank switchable CHR rom
+    uint8_t chr_bank; // mapper 3 has up to 2048K of bank switchable CHR rom
 } mapper3_t;
 
 static uint32_t
@@ -291,7 +291,7 @@ mapper3_map_addr(mapper_t *head, uint16_t addr) {
         // ppu bank switchable chr rom
         // NOTE(shaw): banks not used by the cartridge are mirrored over banks
         // that are used
-        return addr + ((mapper->bank % head->chr_banks) * _8KB);
+        return addr + ((mapper->chr_bank % head->chr_banks) * _8KB);
     }
 
     /* horizontal and vertical nametable mirroring */
@@ -326,10 +326,63 @@ static uint32_t
 mapper3_write(mapper_t *head, uint16_t addr, uint8_t data) {
     if (addr >= 0x8000) {
         mapper3_t *mapper = (mapper3_t *)head;
-        mapper->bank = data;
+        mapper->chr_bank = data;
     }
     return mapper3_map_addr(head, addr);
 }
+
+
+/***************************************************************************** 
+ * MAPPER 7 
+ ****************************************************************************/
+typedef struct {
+    mapper_t head;
+    uint8_t reg; // bits 0,1,2,3 selects 32 KB PRG ROM bank for CPU $8000-$FFFF
+                 // bit 4 selects 1 KB VRAM page for all 4 nametables
+                 //
+                 // NOTE(shaw): nesdev says only low 3 bits are used to select
+                 // prg bank, however some emulators include bit 4 to allow for
+                 // up to 512K roms
+} mapper7_t;
+
+static uint32_t
+mapper7_map_addr(mapper_t *head, uint16_t addr) {
+    mapper7_t *mapper = (mapper7_t *)head;
+
+    if (addr < 0x2000)
+        return addr;
+
+    // nametable mirroring
+    else if (addr < 0x3F00) {
+        uint32_t mapped_addr = (addr & 0x2FFF) - 0x2000;
+        if ((mapper->reg >> 4) & 1)
+            return (mapped_addr & 0x03FF) + 0x0400; // one-screen, upper bank
+        else
+            return mapped_addr & 0x03FF;            // one-screen, lower bank
+    } 
+
+    else if (addr < 0x6000)
+        return addr;
+    else if (addr < 0x8000) /* $6000 - $7FFF */
+        return addr - 0x6000;
+    else                    /* $8000 - $FFFF */
+        return (addr - 0x8000) + ((mapper->reg & 0xF) * _32KB);
+}
+
+static uint32_t 
+mapper7_read(mapper_t *head, uint16_t addr) {
+    return mapper7_map_addr(head, addr);
+}
+
+static uint32_t 
+mapper7_write(mapper_t *head, uint16_t addr, uint8_t data) {
+    if (addr >= 0x8000) {
+        mapper7_t *mapper = (mapper7_t *)head;
+        mapper->reg = data;
+    }
+    return mapper7_map_addr(head, addr);
+}
+
 
 
 
@@ -365,6 +418,12 @@ mapper_t *make_mapper(uint16_t mapper_id, uint8_t prg_banks, uint8_t chr_banks, 
             mapper = (mapper_t *)mapper3;
             break;
         }
+        case 7:
+        {
+            mapper7_t *mapper7 = calloc(1, sizeof(mapper7_t));
+            mapper = (mapper_t *)mapper7;
+            break;
+        }
         default:
             fprintf(stderr, "Unsupported mapper %d\n", mapper_id);
             exit(1);
@@ -386,6 +445,7 @@ uint32_t mapper_read(mapper_t *mapper, uint16_t addr) {
         case 1: return mapper1_read(mapper, addr);
         case 2: return mapper2_read(mapper, addr);
         case 3: return mapper3_read(mapper, addr);
+        case 7: return mapper7_read(mapper, addr);
         default:
             fprintf(stderr, "Unsupported mapper %d\n", mapper->id);
             exit(1);
@@ -399,6 +459,7 @@ uint32_t mapper_write(mapper_t *mapper, uint16_t addr, uint8_t data) {
         case 1: return mapper1_write(mapper, addr, data);
         case 2: return mapper2_write(mapper, addr, data);
         case 3: return mapper3_write(mapper, addr, data);
+        case 7: return mapper7_write(mapper, addr, data);
         default:
             fprintf(stderr, "Unsupported mapper %d\n", mapper->id);
             exit(1);
