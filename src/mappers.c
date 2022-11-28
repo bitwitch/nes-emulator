@@ -334,7 +334,30 @@ mapper3_write(mapper_t *head, uint16_t addr, uint8_t data) {
 
 /***************************************************************************** 
  * MAPPER 7 
+ * 
+ * NOTE(shaw): there are a few games that use this mapper that are among the 
+ * tricky-to-emulate games: https://www.nesdev.org/wiki/Tricky-to-emulate_games
+ * - Battletoads
+ *   Infamous among emulator developers for requiring fairly precise CPU and
+ *   PPU timing (including the cycle penalty for crossing pages) and a fairly
+ *   robust sprite 0 implementation. Because it continuously streams animation
+ *   frames into CHR RAM, it leaves rendering disabled for a number of
+ *   scanlines into the visible frame to gain extra VRAM upload time and then
+ *   enables it. If the timing is off so that the background image appears too
+ *   high or too low at this point, a sprite zero hit will fail to trigger,
+ *   hanging the game. This usually occurs immediately upon entering the first
+ *   stage if the timing is off by enough, and might cause random hangs at
+ *   other points otherwise.
+ * - Cobra Triangle and Ironsword: Wizards and Warriors II
+ *   They rely on the dummy read for the sta $4000,X instruction to acknowledge
+ *   pending APU IRQs.
+ *
+ *   At the time of writing (28 Nov 2022), I don't think I am planning to make
+ *   this emulator super cycle accurate, so some of these games like
+ *   battletoads might be out of reach. 
  ****************************************************************************/
+
+
 typedef struct {
     mapper_t head;
     uint8_t reg; // bits 0,1,2,3 selects 32 KB PRG ROM bank for CPU $8000-$FFFF
