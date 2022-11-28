@@ -579,6 +579,7 @@ void rendering_tick(void) {
 void render_pixel(void) {
     uint8_t bg_pal_index = 0;
     uint8_t bg_pal_num = 0;
+
     if (MASK_SHOW_BG) {
         uint8_t bitnum = 15 - ppu.fine_x;
 
@@ -589,6 +590,11 @@ void render_pixel(void) {
         bg_pal_num = 
             ((ppu.bg_shifter_attr_lo >> bitnum) & 1) |
             (((ppu.bg_shifter_attr_hi >> bitnum) & 1) << 1);
+    }
+
+    if (ppu.cycle < 8 && !MASK_SHOW_BG_LEFT) {
+        bg_pal_index = 0;
+        bg_pal_num = 0;
     }
 
     uint8_t fg_pal_index = 0;
@@ -614,6 +620,11 @@ void render_pixel(void) {
                 break;
         }
 
+    }
+
+    if (ppu.cycle < 8 && !MASK_SHOW_SPR_LEFT) {
+        fg_pal_index = 0;
+        fg_pal_num = 0;
     }
 
     uint8_t pal_index = 0;
