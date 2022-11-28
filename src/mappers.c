@@ -365,8 +365,10 @@ mapper7_map_addr(mapper_t *head, uint16_t addr) {
         return addr;
     else if (addr < 0x8000) /* $6000 - $7FFF */
         return addr - 0x6000;
-    else                    /* $8000 - $FFFF */
-        return (addr - 0x8000) + ((mapper->reg & 0xF) * _32KB);
+    else {                  /* $8000 - $FFFF */
+        uint8_t prg_bank = (mapper->reg & 0xF) % (head->prg_banks/2);
+        return (addr - 0x8000) + (prg_bank * _32KB);
+    }
 }
 
 static uint32_t 
