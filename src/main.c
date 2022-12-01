@@ -29,7 +29,7 @@ extern FILE *logfile;
 static char *cpu_state_lines[MAX_CPU_STATE_LINES];
 
 
-void init_debug_sidebar(sprite_t pattern_tables[2], sprite_t palettes[8], sprite_t *code_quad);
+void init_debug_sidebar(sprite_t pattern_tables[2], sprite_t palettes[8]);
 void render_cpu_state(cpu_t *cpu, char **cpu_state_lines);
 void render_code(uint16_t addr, dasm_map_t *dasm);
 void render_oam_info(void);
@@ -54,7 +54,7 @@ int main(int argc, char **argv) {
 
     for (int i=0; i<MAX_CPU_STATE_LINES-1; ++i) {
         cpu_state_lines[i] = calloc(MAX_DEBUG_LINE_CHARS+1, 1);
-        if (!cpu_state_lines[i]) { perror("malloc"); exit(1); }
+        if (!cpu_state_lines[i]) { perror("calloc"); exit(1); }
     }
     cpu_state_lines[MAX_CPU_STATE_LINES-1] = NULL;
 
@@ -70,8 +70,7 @@ int main(int argc, char **argv) {
     /* initialize debug sidebar */
     sprite_t pattern_tables[2];
     sprite_t palettes[8];
-    sprite_t code_quad;
-    init_debug_sidebar(pattern_tables, palettes, &code_quad);
+    init_debug_sidebar(pattern_tables, palettes);
 
 
     ppu_init(nes_quad.pixels);
@@ -184,9 +183,6 @@ int main(int argc, char **argv) {
                 /*apu_render_sound_wave();*/
                 io_render_present();
                 last_frame_time += MS_PER_FRAME;
-                /* NOTE(shaw): since get_ticks is a uint64_t and only has
-                 * millisecond precision, the MS_PER_FRAME will be truncated to
-                 * 16ms so fps will actually be 62.5 instead of 60 */
             }
 
             break;
@@ -227,10 +223,6 @@ int main(int argc, char **argv) {
 
                 frame_prepared = false;
                 last_frame_time += MS_PER_FRAME;
-
-                /* NOTE(shaw): since get_ticks is a uint64_t and only has
-                 * millisecond precision, the MS_PER_FRAME will be truncated to
-                 * 16ms so fps will actually be 62.5 instead of 60 */
             }
 
             break;
@@ -255,10 +247,7 @@ int main(int argc, char **argv) {
     return 0;
 }
 
-void init_debug_sidebar(sprite_t pattern_tables[2], 
-                        sprite_t palettes[8],
-                        sprite_t *code_quad)
-{
+void init_debug_sidebar(sprite_t pattern_tables[2], sprite_t palettes[8]) {
 
     double debug_width = NES_WIDTH*SCALE*(1-NES_DEBUG_RATIO)/(NES_DEBUG_RATIO);
     double pad = 0.0133333*debug_width;
@@ -292,37 +281,6 @@ void init_debug_sidebar(sprite_t pattern_tables[2],
             pal_height);                                      /* dest height */
         register_sprite(&palettes[i]);
     }
-
-    /* disassembled code */
-    (void)code_quad; 
-    /*int asm_width = 2*((NES_WIDTH*(1-NES_DEBUG_RATIO)/NES_DEBUG_RATIO) - (2*pad/SCALE));*/
-    /*int asm_height = 2*(y_pos - 3*pad)/SCALE;*/
-    /*pixels = malloc(asm_width*asm_height*sizeof(uint32_t));*/
-    /*if (!pixels) { perror("malloc"); exit(1); }*/
-    /**code_quad = make_sprite(pixels, asm_width, asm_height, */
-        /*NES_WIDTH*SCALE + pad, */
-        /*pad, */
-        /*0.5*asm_width*SCALE, */
-        /*0.5*asm_height*SCALE); */
-    /*register_sprite(code_quad);*/
-
-
-    /* TEMPORARY */
-    /* TEMPORARY */
-    /*for (int i=0; i<128*128; ++i) {*/
-        /*pattern_tables[0].pixels[i] = 0xCAB192;*/
-        /*pattern_tables[1].pixels[i] = 0x123040;*/
-    /*}*/
-    /*for (int i=0; i<8; ++i) {*/
-        /*palettes[i].pixels[0] = 0xFF0000;*/
-        /*palettes[i].pixels[1] = 0x00FF00;*/
-        /*palettes[i].pixels[2] = 0x0000FF;*/
-    /*}*/
-    /*for (int i=0; i<code_quad.w*code_quad.h; ++i) {*/
-        /*code_quad.pixels[i] = 0xFFEEEE;*/
-    /*}*/
-    /* TEMPORARY */
-    /* TEMPORARY */
 }
 
 void render_cpu_state(cpu_t *cpu, char **lines) {
