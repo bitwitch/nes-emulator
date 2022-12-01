@@ -51,11 +51,14 @@ typedef struct {
     uint8_t registers[9];
     uint8_t data_buffer;
 
-    /* OAM format */
-    /* byte 0: y position (top) */
-    /* byte 1: tile_id */
-    /* byte 2: attributes */
-    /* byte 3: x position (left) */
+    /* OAM format
+    * byte 0: y position (top)
+    * byte 1: tile_id
+    * byte 2: attributes
+    * byte 3: x position (left) 
+    *
+    * 64 sprites at 4 bytes each = 256 bytes
+    */
     uint8_t oam[256];
     oam_entry_t oam2[8]; /* sprites on a single scanline */
     uint8_t oam_addr;

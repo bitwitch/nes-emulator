@@ -5,10 +5,6 @@
 #include "bus.h"
 #include "stb_ds.h"
 
-#ifdef DEBUG_LOG
-FILE *logfile;
-#endif
-
 typedef union {
     uint16_t w;
 #ifdef CPU6502_BIG_ENDIAN
@@ -17,6 +13,15 @@ typedef union {
     struct { uint8_t l,h; } byte;
 #endif
 } word_t;
+
+uint8_t get_flag(cpu_t *cpu, status_mask_t flag);
+void set_flag(cpu_t *cpu, status_mask_t flag, bool value);
+
+#ifdef DEBUG_LOG
+FILE *logfile;
+void debug_log_instruction(cpu_t *cpu);
+#endif
+
 
 /****************************************************************************/
 /* interrupts */
@@ -293,10 +298,6 @@ uint8_t op_bpl(cpu_t *cpu, uint16_t addr) {
 
 uint8_t op_brk(cpu_t *cpu, uint16_t addr) {
     (void)addr;
-
-    /* TODO(shaw): this is just a hack to get the repl working, need to actually implement BRK */
-    /*cpu->running = false;*/
-
     /* push pc+2 (two bytes after the opcode, leaving one byte for a break mark 
      * one is used below because the opcode has already been read */
     word_t return_addr = { .w = cpu->pc+1 };
@@ -538,7 +539,6 @@ uint8_t op_pla(cpu_t *cpu, uint16_t addr) {
 
 uint8_t op_plp(cpu_t *cpu, uint16_t addr) {
     (void)addr;
-    /*cpu->status = bus_read(0x100 | ++cpu->sp) | STATUS_U | STATUS_B;*/
     cpu->status = (bus_read(0x100 | ++cpu->sp) | STATUS_U) & ~STATUS_B;
     return 0;
 }
@@ -591,7 +591,6 @@ uint8_t op_ror(cpu_t *cpu, uint16_t addr) {
 uint8_t op_rti(cpu_t *cpu, uint16_t addr) {
     (void)addr;
     word_t temp;
-    /*cpu->status = bus_read(0x100 | ++cpu->sp) | STATUS_U | STATUS_B;*/
     cpu->status = (bus_read(0x100 | ++cpu->sp) | STATUS_U) & ~STATUS_B;
     temp.byte.l = bus_read(0x100 | ++cpu->sp);
     temp.byte.h = bus_read(0x100 | ++cpu->sp);
@@ -939,11 +938,8 @@ void cpu_reset(cpu_t *cpu) {
        
     cpu->status = STATUS_I | STATUS_U;
 
-    /* TODO(shaw): the reset vector is 0xFFFC, 0xFFFD on startup the cpu would
-     * read the values at these locations into pc and perform a JMP. For now
-     * i'm just hardcoding the pc to a value */
-    /*cpu->pc = 0xC000;*/
-
+    /* the reset vector is 0xFFFC, 0xFFFD on startup the cpu reads the values
+     * at these locations into pc and perform a JMP */
     cpu->pc = bus_read(0xFFFC) | (bus_read(0xFFFD) << 8);
 
     cpu->cycles = 0;
@@ -952,6 +948,7 @@ void cpu_reset(cpu_t *cpu) {
     cpu->running = true;
 }
 
+/* LEAK: disassemble allocates memory for strings */
 dasm_map_t *disassemble(uint16_t start, uint16_t stop) {
     dasm_map_t *dasm = NULL;
     hmdefault(dasm, "");
