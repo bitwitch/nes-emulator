@@ -16,6 +16,7 @@ if not exist SDL2\ (
 	echo F | xcopy /D ..\SDL2\lib\x64\SDL2main.lib SDL2\lib\SDL2main.lib
 	echo F | xcopy /D ..\SDL2\lib\x64\SDL2.dll .
 )
+
 setlocal EnableExtensions EnableDelayedExpansion
 set sources=
 for %%i in (..\src\*.c) do set sources=!sources! %%i
