@@ -7,7 +7,6 @@ if not exist SDL2\ (
 	if exist ..\SDL2\ (
 		xcopy /D /E /I ..\SDL2\include SDL2\include\SDL2
 		echo F | xcopy /D ..\SDL2\lib\x64\SDL2.lib SDL2\lib\SDL2.lib
-		echo F | xcopy /D ..\SDL2\lib\x64\SDL2main.lib SDL2\lib\SDL2main.lib
 		echo F | xcopy /D ..\SDL2\lib\x64\SDL2.dll .
 REM prompt user to download SDL2 if not found
 	) else (
@@ -23,7 +22,7 @@ setlocal EnableExtensions EnableDelayedExpansion
 set sources=
 for %%i in (..\src\*.c) do set sources=!sources! %%i
 
-cl %sources% /DSDL_MAIN_HANDLED SDL2main.lib SDL2.lib /Zi /W2 /nologo /Fenes /I.. /I..\src /ISDL2\include /link /LIBPATH:SDL2\lib
+cl %sources% /DSDL_MAIN_HANDLED SDL2.lib /Zi /W2 /nologo /Fenes /I.. /I..\src /ISDL2\include /link /LIBPATH:SDL2\lib
 
 endlocal
 popd
