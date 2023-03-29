@@ -6,3 +6,5 @@ nes.exe
 *.pdb
 *.ilk
 *.obj
+SDL2
+SDL2.dll

@@ -6,8 +6,14 @@ in the nesdev forums to questions about the APU. They helped me immensely when
 trying to figure out audio, even so many years after he wrote them.  
 
 ## Dependencies
-[SDL2](https://www.libsdl.org/download-2.0.php)  
+[SDL2](https://github.com/libsdl-org/SDL/releases/)  
 Linux installation instructions [here](http://wiki.libsdl.org/Installation#linuxunix)  
+
+**Windows**
+1. Download the SDL2 developement libary for VC
+	- All releases found [here](https://github.com/libsdl-org/SDL/releases/)  
+	- Version 2.26.4 download: [SDL2-devel-2.26.4-VC.zip](https://github.com/libsdl-org/SDL/releases/download/release-2.26.4/SDL2-devel-2.26.4-VC.zip)  
+2. Extract the contents and move them to a directory called SDL2 in the project root
 
 # Building
 ## Linux
