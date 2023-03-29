@@ -256,7 +256,7 @@ void apu_init(void) {
 
     ad_buffer = malloc(ad_buffer_size * sizeof(float));
     if (!ad_buffer) {
-        fprintf(stderr, "[AUDIO] Failed to allocate %lu bytes for the audio device buffer\n", 
+        fprintf(stderr, "[AUDIO] Failed to allocate %zu bytes for the audio device buffer\n", 
                 ad_buffer_size * sizeof(float));
     }
 
@@ -724,7 +724,7 @@ static void tick_triangle_channel(void) {
 
 static uint8_t triangle_output(void) {
     tri_channel_t *tri = &apu.triangle;
-    if (tri->ultrasonic)       return 7.5;
+    if (tri->ultrasonic)       return 7; // TODO(shaw): why was this 7.5 before?
     else if (tri->step & 0x10) return tri->step ^ 0x1F;
     else                       return tri->step;
 }

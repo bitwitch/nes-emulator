@@ -113,7 +113,7 @@ mapper1_map_addr(mapper_t *head, uint16_t addr) {
                 : ((mapped_addr-0x0800) & 0x03FF) + 0x0400;
         default:
             assert(0 && "unknown mirror mode");
-            break;
+			return 0;
         }
     } 
 
@@ -141,7 +141,7 @@ mapper1_map_addr(mapper_t *head, uint16_t addr) {
             }
             default:
                 assert(0 && "unknown prg_bank_mode");
-                break;
+                return 0;
         }
     }
 
@@ -164,7 +164,7 @@ mapper1_map_addr(mapper_t *head, uint16_t addr) {
                 return (addr - 0xC000) + ((head->prg_banks-1) * _16KB);
             default:
                 assert(0 && "unknown prg_bank_mode");
-                break;
+				return 0;
         }
     }
 }

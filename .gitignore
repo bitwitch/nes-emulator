@@ -2,5 +2,7 @@ references.txt
 notes.txt
 tags
 nes
-SDL2
-build-windows
+nes.exe
+*.pdb
+*.ilk
+*.obj

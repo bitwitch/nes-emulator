@@ -1,15 +1,11 @@
 @echo off
-mkdir .\build-windows
 pushd .\build-windows
-
-xcopy /D ..\SDL2\bin\SDL2.dll .\SDL2.dll
-xcopy /E /I /D ..\font.png .
-
+xcopy /D ..\font.png .
 setlocal EnableDelayedExpansion
 setlocal EnableExtensions
 set sources=
-for %%i in (..\src\*) do set sources=!sources! %%i
+for %%i in (..\src\*.c) do set sources=!sources! %%i
 
-gcc -Wall -g %sources% -I..\SDL2\include -I.. -I..\src -L..\SDL2\lib -lmingw32 -lSDL2main -lSDL2 -o nes
+cl %sources% /DSDL_MAIN_HANDLED SDL2main.lib SDL2.lib /Zi /W2 /nologo /Fenes /I.. /I..\src /ISDL2\include /link /LIBPATH:SDL2\lib
 
 popd

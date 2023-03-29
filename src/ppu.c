@@ -256,7 +256,9 @@ row * w + col
 
 /* used just for debug drawing pattern_tables */
 void update_pattern_tables(int selected_palette, sprite_t pattern_tables[2]) {
-    int pitch = pattern_tables[0].surface->pitch;
+	SDL_Surface *surface = pattern_tables[0].surface;
+	assert(surface->format->BytesPerPixel);
+    int pitch = surface->pitch / surface->format->BytesPerPixel;
     /*for each pattern table*/
     for (int table=0; table<2; ++table)
     /*for each tile in the pattern table*/

@@ -39,7 +39,7 @@ void io_init(void) {
         "NES",
         SDL_WINDOWPOS_UNDEFINED,
         SDL_WINDOWPOS_UNDEFINED,
-        WINDOW_WIDTH, WINDOW_HEIGHT,
+        (int)WINDOW_WIDTH, (int)WINDOW_HEIGHT,
         SDL_WINDOW_RESIZABLE);
     if (!window) {
         fprintf(stderr, "Failed to create window: %s\n", SDL_GetError());
@@ -364,11 +364,11 @@ sprite_t make_sub_sprite(uint32_t *pixels, int w, int h,
     s.surface = SDL_CreateRGBSurfaceFrom(
         pixels,
         w, h,
-        8*3,      /* depth */
-        w,        /* pitch */
+        8 * sizeof(*pixels),  /* depth */
+        w * sizeof(*pixels),  /* pitch */
         0x0000FF, 
         0x00FF00, 
-        0xFF0000, 
+        0xFF0000,
         0);
     if (!s.surface) {
         fprintf(stderr, "Creating surface failed: %s", SDL_GetError());

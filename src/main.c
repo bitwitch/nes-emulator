@@ -60,8 +60,8 @@ int main(int argc, char **argv) {
 
     uint32_t *pixels = malloc(PPU_WIDTH*PPU_HEIGHT*sizeof(uint32_t));
     if (!pixels) { perror("malloc"); exit(1); }
-    int vertical_overscan = 0.5*(PPU_HEIGHT - NES_HEIGHT);
-    int horizontal_overscan = 0.5*(PPU_WIDTH - NES_WIDTH);
+    int vertical_overscan = (int)(0.5*(PPU_HEIGHT - NES_HEIGHT));
+    int horizontal_overscan = (int)(0.5*(PPU_WIDTH - NES_WIDTH));
     sprite_t nes_quad = make_sub_sprite(pixels, PPU_WIDTH, PPU_HEIGHT, 
         horizontal_overscan, vertical_overscan, NES_WIDTH, NES_HEIGHT,
         0, 0, NES_WIDTH*SCALE, NES_HEIGHT*SCALE);
@@ -260,10 +260,10 @@ void init_debug_sidebar(sprite_t pattern_tables[2], sprite_t palettes[8]) {
         uint32_t *pixels = malloc(128*128*sizeof(uint32_t));
         if (!pixels) { perror("malloc"); exit(1); }
         pattern_tables[i] = make_sprite(pixels, 128, 128, 
-            (NES_WIDTH*SCALE) + pad + i*(pat_width+pad),      /* dest x */
-            y_pos,                                            /* dest y */
-            pat_width,                                        /* dest width */
-            pat_width);                                       /* dest height */
+            (int)((NES_WIDTH*SCALE) + pad + i*(pat_width+pad)), /* dest x */
+            (int)y_pos,                                         /* dest y */
+            (int)pat_width,                                     /* dest width */
+            (int)pat_width);                                    /* dest height */
         register_sprite(&pattern_tables[i]);
     }
 
@@ -275,10 +275,10 @@ void init_debug_sidebar(sprite_t pattern_tables[2], sprite_t palettes[8]) {
         uint32_t *pixels = malloc(4*1*sizeof(uint32_t));
         if (!pixels) { perror("malloc"); exit(1); }
         palettes[i] = make_sprite(pixels, 4, 1, 
-            (NES_WIDTH*SCALE) + pad + i*(pal_width+pad),      /* dest x */
-            y_pos,                                            /* dest y */
-            pal_width,                                        /* dest width */
-            pal_height);                                      /* dest height */
+            (int)((NES_WIDTH*SCALE) + pad + i*(pal_width+pad)), /* dest x */
+            (int)y_pos,                                         /* dest y */
+            (int)pal_width,                                     /* dest width */
+            (int)pal_height);                                   /* dest height */
         register_sprite(&palettes[i]);
     }
 }
@@ -299,7 +299,9 @@ void render_cpu_state(cpu_t *cpu, char **lines) {
     for (int i=0; i<MAX_CPU_STATE_LINES; ++i) {
         char *line = lines[i];
         if (line == NULL) break;
-        render_text(line, NES_WIDTH*SCALE+PAD, i*FONT_CHAR_HEIGHT*SCALE+PAD);
+        render_text(line, 
+        	(int)(NES_WIDTH*SCALE+PAD), 
+        	(int)(i*FONT_CHAR_HEIGHT*SCALE+PAD));
     }
     #undef PAD
 }   
@@ -319,8 +321,8 @@ void render_oam_info(void) {
         
         snprintf(line, MAX_DEBUG_LINE_CHARS+1, "(%3d,%3d) %2X %2X", x,y,tile_id,attr);
         render_text(line, 
-            NES_WIDTH*SCALE+PAD, 
-            i*FONT_CHAR_HEIGHT*SCALE + 7*FONT_CHAR_HEIGHT*SCALE + PAD);
+            (int)(NES_WIDTH*SCALE+PAD), 
+            (int)(i*FONT_CHAR_HEIGHT*SCALE + 7*FONT_CHAR_HEIGHT*SCALE + PAD));
     }
     #undef PAD
 }
@@ -336,13 +338,13 @@ void render_code(uint16_t addr, dasm_map_t *dasm) {
     for (int i=min_index; i<=max_index; ++i) {
         if (i == ins_index)
             render_text_color(dasm[i].value, 
-                NES_WIDTH*SCALE+PAD, 
-                (i-min_index)*FONT_CHAR_HEIGHT*SCALE + 7*FONT_CHAR_HEIGHT*SCALE + PAD,
+                (int)(NES_WIDTH*SCALE+PAD), 
+                (int)((i-min_index)*FONT_CHAR_HEIGHT*SCALE + 7*FONT_CHAR_HEIGHT*SCALE + PAD),
                 0xFFA7ED);
         else
             render_text(dasm[i].value, 
-                NES_WIDTH*SCALE+PAD, 
-                (i-min_index)*FONT_CHAR_HEIGHT*SCALE + 7*FONT_CHAR_HEIGHT*SCALE + PAD);
+                (int)(NES_WIDTH*SCALE+PAD), 
+                (int)((i-min_index)*FONT_CHAR_HEIGHT*SCALE + 7*FONT_CHAR_HEIGHT*SCALE + PAD));
     }
     #undef PAD
 }

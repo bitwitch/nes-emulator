@@ -133,9 +133,10 @@ void delete_cart() {
 uint8_t cart_cpu_read(uint16_t addr) {
     uint32_t mapped_addr = mapper_read(cart.mapper, addr);
 
-    if (addr < 0x4020)
-        assert(0 && "cpu should only access cartridge from 0x4020-0xFFFF");
-    else if (addr < 0x6000) {
+	if (addr < 0x4020) {
+		assert(0 && "cpu should only access cartridge from 0x4020-0xFFFF");
+		return 0;
+	} else if (addr < 0x6000) {
         // NOTE(shaw): currently ignoring 0x4020 - 0x5FFF, but some mappers use this address space
         // https://www.nesdev.org/wiki/Category:Mappers_using_$4020-$5FFF
         return 0;
