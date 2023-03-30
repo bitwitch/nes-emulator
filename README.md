@@ -5,24 +5,21 @@ information are amazing. Special thanks to Disch [RIP] who wrote many answers
 in the nesdev forums to questions about the APU. They helped me immensely when  
 trying to figure out audio, even so many years after he wrote them.  
 
-## Dependencies
-[SDL2](https://github.com/libsdl-org/SDL/releases/)  
-Linux installation instructions [here](http://wiki.libsdl.org/Installation#linuxunix)  
+# Linux
+Install [SDL2](https://github.com/libsdl-org/SDL/releases/)  
+Linux installation instructions [here](http://wiki.libsdl.org/Installation#linuxunix)
+## Building
+1. run `make`  
+2. run `./nes <path_to_game_rom>`  
 
-**Windows**
+# Windows
 The build.bat file will attempt to download SDL2 for you.  
 **YOU ONLY NEED TO DO THE FOLLOWING IF THE build.bat SCRIPT FAILS FOR SOME REASON**  
 1. Download the SDL2 developement libary for VC
 	- All releases found [here](https://github.com/libsdl-org/SDL/releases/)  
 	- Version 2.26.4 download: [SDL2-devel-2.26.4-VC.zip](https://github.com/libsdl-org/SDL/releases/download/release-2.26.4/SDL2-devel-2.26.4-VC.zip)  
 2. Extract the contents and move them to a directory called SDL2 in the project root
-
-# Building
-## Linux
-1. run `make`  
-2. run `./nes <path_to_game_rom>`  
-
-## Windows
+## Building
 1. Make sure you have access to the msvc compiler
 	- This can be done by running  `vcvarsall.bat`, whose location will depend on  
 	where you installed Visual Studio. An example from one of the machines I use is:  
