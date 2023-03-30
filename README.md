@@ -10,6 +10,8 @@ trying to figure out audio, even so many years after he wrote them.
 Linux installation instructions [here](http://wiki.libsdl.org/Installation#linuxunix)  
 
 **Windows**
+The build.bat file will attempt to download SDL2 for you.  
+**YOU ONLY NEED TO DO THE FOLLOWING IF THE build.bat SCRIPT FAILS FOR SOME REASON**  
 1. Download the SDL2 developement libary for VC
 	- All releases found [here](https://github.com/libsdl-org/SDL/releases/)  
 	- Version 2.26.4 download: [SDL2-devel-2.26.4-VC.zip](https://github.com/libsdl-org/SDL/releases/download/release-2.26.4/SDL2-devel-2.26.4-VC.zip)  
