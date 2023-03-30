@@ -19,8 +19,7 @@ The build.bat file will attempt to download SDL2 for you.
 	- All releases found [here](https://github.com/libsdl-org/SDL/releases/)  
 	- Version 2.26.4 download: [SDL2-devel-2.26.4-VC.zip](https://github.com/libsdl-org/SDL/releases/download/release-2.26.4/SDL2-devel-2.26.4-VC.zip)  
 2. Extract the contents and move them to a directory called SDL2 in the project root  
-	(if you extract to a dir called unzipped, you will need to move   
-	unzipped/SDL2-2.26.4 to SDL2)  
+	(if you extract to a dir called unzipped, you will need to move unzipped/SDL2-2.26.4 to SDL2)   
 ## Building
 1. Make sure you have access to the msvc compiler
 	- This can be done by running  `vcvarsall.bat`, whose location will depend on  
