@@ -1,6 +1,6 @@
 @echo off
-if not exist build-windows mkdir build-windows
-pushd build-windows
+if not exist build\ mkdir build
+pushd build
 
 setlocal EnableExtensions EnableDelayedExpansion
 set URL=https://github.com/libsdl-org/SDL/releases/download/release-2.26.4/SDL2-devel-2.26.4-VC.zip

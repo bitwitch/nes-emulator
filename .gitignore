@@ -2,7 +2,7 @@ references.txt
 notes.txt
 tags
 nes
-build-windows/
+build/
 *.pdb
 *.ilk
 *.obj
