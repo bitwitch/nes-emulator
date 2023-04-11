@@ -25,8 +25,8 @@ The build.bat file will attempt to download SDL2 for you.
 	- This can be done by running  `vcvarsall.bat`, whose location will depend on  
 	where you installed Visual Studio. An example from one of the machines I use is:  
 	`"C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvarsall.bat" x86_amd64`
-1. run `build`  
-2. run `build-windows\nes <path_to_game_rom>`   
+1. run `build.bat`  
+2. run `build\nes <path_to_game_rom>`   
   
 #### References:
 http://6502.org  
