@@ -1,14 +1,34 @@
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
+#include <string.h>
+#include <stdbool.h>
+#include <errno.h>
+#include <math.h>
+#include <signal.h>
+#include <SDL2/SDL.h>
+#include <SDL2/SDL_audio.h>
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
 #define STB_DS_IMPLEMENTATION
 #include "stb_ds.h"
+
 #include "cpu_6502.h"
 #include "bus.h"
+#include "mappers.h"
 #include "cart.h"
 #include "io.h"
 #include "ppu.h"
 #include "apu.h"
+
+#include "cpu_6502.c"
+#include "bus.c"
+#include "mappers.c"
+#include "cart.c"
+#include "io.c"
+#include "ppu.c"
+#include "apu.c"
 
 #define MS_PER_FRAME (1000/60)
 

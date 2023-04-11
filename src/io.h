@@ -1,10 +1,6 @@
 #ifndef __IO_H__
 #define __IO_H__
 
-#include <SDL2/SDL.h>
-#include <stdbool.h>
-#include <stdint.h>
-
 /* PPU_WIDTH and HEIGHT is size output by the ppu */
 #define PPU_WIDTH  256
 #define PPU_HEIGHT 240

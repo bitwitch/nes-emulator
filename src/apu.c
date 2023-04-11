@@ -1,15 +1,3 @@
-#include "apu.h"
-#include <assert.h>
-#include <stdbool.h>
-#include <stdio.h>
-#include <stdlib.h> // malloc
-#include <math.h>
-#include <SDL2/SDL_audio.h>
-#include "io.h"
-
-uint8_t bus_read(uint16_t addr); // from bus.h but have to avoid cyclic dependency
-
-
 typedef struct {
     uint8_t duty            : 2;
     uint8_t loop            : 1;

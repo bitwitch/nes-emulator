@@ -1,8 +1,6 @@
 #ifndef __BUS_H
 #define __BUS_H
 
-#include <stdint.h>
-
 struct cpu_t;
 
 void init_memory(void);

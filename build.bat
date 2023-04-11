@@ -49,7 +49,7 @@ if not exist font.png xcopy /D ..\font.png .
 set sources=
 for %%i in (..\src\*.c) do set sources=!sources! %%i
 
-cl %sources% /DSDL_MAIN_HANDLED SDL2.lib /Zi /W2 /nologo /Fenes /I.. /I..\src /ISDL2\include /link /LIBPATH:SDL2\lib
+cl ..\src\main.c /DSDL_MAIN_HANDLED SDL2.lib /Zi /W2 /nologo /Fenes /I.. /I..\src /ISDL2\include /link /LIBPATH:SDL2\lib
 
 endlocal
 popd

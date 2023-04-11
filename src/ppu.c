@@ -1,14 +1,3 @@
-#include <assert.h>
-#include <stdbool.h>
-#include <stdlib.h> /* for rand */
-#include <string.h> /* for memset */
-#include "ppu.h"
-#include "io.h"
-#include "cart.h"
-
-
-
-
 /*
  *  Loopy Registers:
  *  yyy NN YYYYY XXXXX

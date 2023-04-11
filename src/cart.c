@@ -21,15 +21,6 @@
     more info: https://www.nesdev.org/wiki/INES
 */
 
-#include <assert.h>
-#include <stdio.h>
-#include <stdlib.h> 
-#include <stdbool.h> 
-#include <string.h>
-#include <errno.h>
-#include "cart.h"
-#include "mappers.h"
-
 #define PRG_RAM_SIZE 8192
 
 typedef struct {

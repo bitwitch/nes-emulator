@@ -1,9 +1,6 @@
 #ifndef CPU_6502_H
 #define CPU_6502_H
 
-#include <stdint.h>
-#include <stdbool.h>
-
 #define OP_COUNT 256
 
 typedef struct cpu_t cpu_t;

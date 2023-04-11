@@ -1,10 +1,3 @@
-#include <assert.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include "cpu_6502.h"
-#include "bus.h"
-#include "stb_ds.h"
-
 typedef union {
     uint16_t w;
 #ifdef CPU6502_BIG_ENDIAN

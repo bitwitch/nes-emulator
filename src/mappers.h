@@ -1,9 +1,6 @@
 #ifndef _MAPPER_H_
 #define _MAPPER_H_
 
-#include <stdint.h>
-#include <stdbool.h>
-
 #define _4KB                   4096
 #define _8KB                   8192
 #define _16KB                  16384

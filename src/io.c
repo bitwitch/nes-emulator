@@ -1,10 +1,3 @@
-#include <assert.h>
-#include <signal.h>
-#include "io.h"
-#include "apu.h"
-#define STB_IMAGE_IMPLEMENTATION
-#include "stb_image.h"
-
 #define MAX_WINDOW_SPRITES 16
 
 static struct {
