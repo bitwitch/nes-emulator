@@ -14,7 +14,7 @@
 
 #define MAX_CPU_STATE_LINES 36
 #define MAX_DEBUG_LINE_CHARS 34
-#define MAX_CODE_LINES 10
+#define MAX_CODE_LINES 14
 
 typedef enum {
     EM_RUN,
@@ -27,9 +27,11 @@ extern FILE *logfile;
 #endif
 
 static char *cpu_state_lines[MAX_CPU_STATE_LINES];
+static sprite_t pattern_tables[2];
+static sprite_t palettes[8];
 
 
-void init_debug_sidebar(sprite_t pattern_tables[2], sprite_t palettes[8]);
+void init_debug_chr_viewer(sprite_t pattern_tables[2], sprite_t palettes[8]);
 void render_cpu_state(cpu_t *cpu, char **cpu_state_lines);
 void render_code(uint16_t addr, dasm_map_t *dasm);
 void render_oam_info(void);
@@ -62,21 +64,14 @@ int main(int argc, char **argv) {
     if (!pixels) { perror("malloc"); exit(1); }
     int vertical_overscan = (int)(0.5*(PPU_HEIGHT - NES_HEIGHT));
     int horizontal_overscan = (int)(0.5*(PPU_WIDTH - NES_WIDTH));
-    sprite_t nes_quad = make_sub_sprite(pixels, PPU_WIDTH, PPU_HEIGHT, 
-        horizontal_overscan, vertical_overscan, NES_WIDTH, NES_HEIGHT,
+    sprite_t nes_quad = make_sub_sprite(WIN_NES, pixels, 
+		PPU_WIDTH, PPU_HEIGHT, 
+        horizontal_overscan, vertical_overscan, 
+		NES_WIDTH, NES_HEIGHT,
         0, 0, NES_WIDTH*SCALE, NES_HEIGHT*SCALE);
-    register_sprite(&nes_quad);
-
-    /* initialize debug sidebar */
-    sprite_t pattern_tables[2];
-    sprite_t palettes[8];
-    init_debug_sidebar(pattern_tables, palettes);
-
+    register_sprite(&nes_quad, WIN_NES);
 
     ppu_init(nes_quad.pixels);
-
-    update_pattern_tables(0, pattern_tables);
-    update_palettes(palettes);
 
     cpu_reset(&cpu);
 
@@ -94,6 +89,19 @@ int main(int argc, char **argv) {
         last_platform_state = platform_state;
         do_input();
 
+		// activate debug window
+		if (platform_state.tilde) {
+			SDL_Window *debug_window = io_get_window(WIN_DEBUG);
+			if (!debug_window) {
+				io_init_debug_window();
+				init_debug_chr_viewer(pattern_tables, palettes);
+				update_pattern_tables(0, pattern_tables);
+				update_palettes(palettes);
+			} else {
+				SDL_ShowWindow(debug_window);
+				SDL_RaiseWindow(debug_window);
+			}
+		}
 
         /* transfer states */
         if (platform_state.enter && !last_platform_state.enter)
@@ -122,8 +130,10 @@ int main(int argc, char **argv) {
                 apu_flush_sound_buffer();
                 frame_prepared = true;
 
-                update_pattern_tables(0, pattern_tables);
-                update_palettes(palettes);
+				if (io_get_window(WIN_DEBUG)) {
+					update_pattern_tables(0, pattern_tables);
+					update_palettes(palettes);
+				}
             }
 
             /* render */
@@ -168,8 +178,11 @@ int main(int argc, char **argv) {
                     ppu_clear_frame_completed();
                     apu_flush_sound_buffer();
                 }
-                update_pattern_tables(0, pattern_tables);
-                update_palettes(palettes);
+
+				if (io_get_window(WIN_DEBUG)) {
+					update_pattern_tables(0, pattern_tables);
+					update_palettes(palettes);
+				}
             }
 
             /* render */
@@ -206,8 +219,10 @@ int main(int argc, char **argv) {
                 apu_flush_sound_buffer();
                 frame_prepared = true;
 
-                update_pattern_tables(0, pattern_tables);
-                update_palettes(palettes);
+				if (io_get_window(WIN_DEBUG)) {
+					update_pattern_tables(0, pattern_tables);
+					update_palettes(palettes);
+				}
             }
 
             /* render */
@@ -247,39 +262,39 @@ int main(int argc, char **argv) {
     return 0;
 }
 
-void init_debug_sidebar(sprite_t pattern_tables[2], sprite_t palettes[8]) {
-
-    double debug_width = NES_WIDTH*SCALE*(1-NES_DEBUG_RATIO)/(NES_DEBUG_RATIO);
-    double pad = 0.0133333*debug_width;
+void init_debug_chr_viewer(sprite_t pattern_tables[2], sprite_t palettes[8]) {
+    double pad = 0.0133333*DEBUG_WINDOW_WIDTH;
     double y_pos;
 
     /* pattern tables */
-    double pat_width = 0.48*debug_width;
-    y_pos = (NES_HEIGHT*SCALE) - pat_width - pad;
+    double pat_width = 0.48*DEBUG_WINDOW_WIDTH;
+    y_pos = DEBUG_WINDOW_HEIGHT - pat_width - pad;
     for (int i=0; i<2; ++i) {
         uint32_t *pixels = malloc(128*128*sizeof(uint32_t));
         if (!pixels) { perror("malloc"); exit(1); }
-        pattern_tables[i] = make_sprite(pixels, 128, 128, 
-            (int)((NES_WIDTH*SCALE) + pad + i*(pat_width+pad)), /* dest x */
+        pattern_tables[i] = make_sprite(WIN_DEBUG, pixels, 
+			128, 128, 
+            (int)(pad + i*(pat_width+pad)), /* dest x */
             (int)y_pos,                                         /* dest y */
             (int)pat_width,                                     /* dest width */
             (int)pat_width);                                    /* dest height */
-        register_sprite(&pattern_tables[i]);
+        register_sprite(&pattern_tables[i], WIN_DEBUG);
     }
 
     /* palettes */
-    double pal_width = 0.11*debug_width;
+    double pal_width = 0.11*DEBUG_WINDOW_WIDTH;
     int pal_height = 10;
     y_pos -= 2*pad + pal_height;
     for (int i=0; i<8; ++i) {
         uint32_t *pixels = malloc(4*1*sizeof(uint32_t));
         if (!pixels) { perror("malloc"); exit(1); }
-        palettes[i] = make_sprite(pixels, 4, 1, 
-            (int)((NES_WIDTH*SCALE) + pad + i*(pal_width+pad)), /* dest x */
+        palettes[i] = make_sprite(WIN_DEBUG, pixels, 
+			4, 1, 
+            (int)(pad + i*(pal_width+pad)), /* dest x */
             (int)y_pos,                                         /* dest y */
             (int)pal_width,                                     /* dest width */
             (int)pal_height);                                   /* dest height */
-        register_sprite(&palettes[i]);
+        register_sprite(&palettes[i], WIN_DEBUG);
     }
 }
 
@@ -295,15 +310,14 @@ void render_cpu_state(cpu_t *cpu, char **lines) {
     snprintf(lines[5], MAX_DEBUG_LINE_CHARS+1, " Y: %.2X", cpu->y);
     snprintf(lines[6], MAX_DEBUG_LINE_CHARS+1, "SP: %.2X", cpu->sp);
 
-    #define PAD (0.0133333*NES_WIDTH*SCALE*(1-NES_DEBUG_RATIO)/(NES_DEBUG_RATIO))
+    int pad = (int)(0.0133333 * DEBUG_WINDOW_WIDTH);
     for (int i=0; i<MAX_CPU_STATE_LINES; ++i) {
         char *line = lines[i];
         if (line == NULL) break;
-        render_text(line, 
-        	(int)(NES_WIDTH*SCALE+PAD), 
-        	(int)(i*FONT_CHAR_HEIGHT*SCALE+PAD));
+        render_text(WIN_DEBUG, line, 
+        	pad, 
+        	(int)(i*FONT_CHAR_HEIGHT*FONT_SCALE + pad));
     }
-    #undef PAD
 }   
 
 void render_oam_info(void) {
@@ -312,7 +326,7 @@ void render_oam_info(void) {
     char line[MAX_DEBUG_LINE_CHARS+1];
     uint8_t *oam = ppu_get_oam();
     
-    #define PAD (0.0133333*NES_WIDTH*SCALE*(1-NES_DEBUG_RATIO)/(NES_DEBUG_RATIO))
+    int pad = (int)(0.0133333 * DEBUG_WINDOW_WIDTH);
     for (i=0; i<MAX_CODE_LINES; ++i) {
         y       = oam[i*4];
         tile_id = oam[i*4+1];
@@ -320,11 +334,10 @@ void render_oam_info(void) {
         x       = oam[i*4+3];
         
         snprintf(line, MAX_DEBUG_LINE_CHARS+1, "(%3d,%3d) %2X %2X", x,y,tile_id,attr);
-        render_text(line, 
-            (int)(NES_WIDTH*SCALE+PAD), 
-            (int)(i*FONT_CHAR_HEIGHT*SCALE + 7*FONT_CHAR_HEIGHT*SCALE + PAD));
+        render_text(WIN_DEBUG, line, 
+			pad,
+            (int)(i*FONT_CHAR_HEIGHT*FONT_SCALE + 7*FONT_CHAR_HEIGHT*FONT_SCALE + pad));
     }
-    #undef PAD
 }
 
 void render_code(uint16_t addr, dasm_map_t *dasm) {
@@ -334,18 +347,17 @@ void render_code(uint16_t addr, dasm_map_t *dasm) {
     int min_index = max_index - (MAX_CODE_LINES-1); 
     if (min_index < 0) min_index = 0;
 
-    #define PAD (0.0133333*NES_WIDTH*SCALE*(1-NES_DEBUG_RATIO)/(NES_DEBUG_RATIO))
+    int pad = (int)(0.0133333 * DEBUG_WINDOW_WIDTH);
     for (int i=min_index; i<=max_index; ++i) {
         if (i == ins_index)
-            render_text_color(dasm[i].value, 
-                (int)(NES_WIDTH*SCALE+PAD), 
-                (int)((i-min_index)*FONT_CHAR_HEIGHT*SCALE + 7*FONT_CHAR_HEIGHT*SCALE + PAD),
+            render_text_color(WIN_DEBUG, dasm[i].value, 
+				pad,
+                (int)((i-min_index)*FONT_CHAR_HEIGHT*FONT_SCALE + 7*FONT_CHAR_HEIGHT*FONT_SCALE + pad),
                 0xFFA7ED);
         else
-            render_text(dasm[i].value, 
-                (int)(NES_WIDTH*SCALE+PAD), 
-                (int)((i-min_index)*FONT_CHAR_HEIGHT*SCALE + 7*FONT_CHAR_HEIGHT*SCALE + PAD));
+            render_text(WIN_DEBUG, dasm[i].value, 
+				pad,
+                (int)((i-min_index)*FONT_CHAR_HEIGHT*FONT_SCALE + 7*FONT_CHAR_HEIGHT*FONT_SCALE + pad));
     }
-    #undef PAD
 }
 

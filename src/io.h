@@ -12,11 +12,19 @@
 #define NES_WIDTH  256
 #define NES_HEIGHT 224
 #define SCALE 3
-#define NES_DEBUG_RATIO (0.68) /* how much of screen is nes vs how much is debug info */
-#define WINDOW_WIDTH  (NES_WIDTH*SCALE/NES_DEBUG_RATIO)
+#define WINDOW_WIDTH  (NES_WIDTH*SCALE)
 #define WINDOW_HEIGHT (NES_HEIGHT*SCALE)
+#define DEBUG_WINDOW_WIDTH  (NES_WIDTH*SCALE*0.66)
+#define DEBUG_WINDOW_HEIGHT (NES_HEIGHT*SCALE)
+
 #define FONT_CHAR_WIDTH 7
 #define FONT_CHAR_HEIGHT 9
+#define FONT_SCALE 2
+
+typedef enum {
+	WIN_NES,
+	WIN_DEBUG,
+} WindowId;
 
 typedef struct {
     SDL_Texture *texture;
@@ -32,6 +40,7 @@ typedef struct {
     bool escape;
     bool f,w;
     bool nine;
+    bool tilde;
 
     uint8_t controller_states[2];
 } platform_state_t;
@@ -53,6 +62,9 @@ extern uint8_t controller_registers[2]; /* parallel to serial shift registers */
 
 void io_init(void);
 void io_deinit(void);
+void io_init_debug_window(void);
+void io_destroy_debug_window(void);
+SDL_Window *io_get_window(WindowId wid);
 void io_render_prepare(void);
 void io_render_sprites(void);
 void io_render_present(void);
@@ -60,15 +72,15 @@ uint64_t get_ticks(void);
 void controller_write(int controller_index, uint8_t data);
 uint8_t controller_read(int controller_index);
 void do_input();
-sprite_t make_sprite(uint32_t *pixels, int w, int h, 
+sprite_t make_sprite(WindowId wid, uint32_t *pixels, int w, int h, 
                      int dest_x, int dest_y, int dest_w, int dest_h);
-sprite_t make_sub_sprite(uint32_t *pixels, int w, int h, 
+sprite_t make_sub_sprite(WindowId wid, uint32_t *pixels, int w, int h, 
                          int src_x, int src_y, int src_w, int src_h,
                          int dest_x, int dest_y, int dest_w, int dest_h);
-void register_sprite(sprite_t *sprite);
+void register_sprite(sprite_t *sprite, WindowId id);
 void set_font_color(uint32_t color);
-void render_text(char *text, int x, int y);
-void render_text_color(char *text, int x, int y, uint32_t color_mod);
+void render_text(WindowId wid, char *text, int x, int y);
+void render_text_color(WindowId wid, char *text, int x, int y, uint32_t color_mod);
 
 
 #endif
