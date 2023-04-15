@@ -1,10 +1,6 @@
 typedef union {
     uint16_t w;
-#ifdef CPU6502_BIG_ENDIAN
-    struct { uint8_t h,l; } byte;
-#else
     struct { uint8_t l,h; } byte;
-#endif
 } word_t;
 
 uint8_t get_flag(cpu_t *cpu, status_mask_t flag);
@@ -941,83 +937,129 @@ void cpu_reset(cpu_t *cpu) {
     cpu->running = true;
 }
 
-/* LEAK: disassemble allocates memory for strings */
-dasm_map_t *disassemble(uint16_t start, uint16_t stop) {
-    dasm_map_t *dasm = NULL;
-    hmdefault(dasm, "");
+/****************************************************************************/
+/* instruction address cache */
+/****************************************************************************/
+#define MAX_CACHED_INS 14
+// ring buffer of cached instruction addresses, used for disassembling code
+// that is a few instructions behind the current program counter
+static uint16_t cached_ins_addrs[MAX_CACHED_INS];
+static int cached_ins_index;
 
-    uint8_t opcode;
-    uint16_t addr = start;
-    uint8_t (*am)(cpu_t *cpu, uint16_t *addr);
-
-    while (addr >= start && addr <= stop) {
-        char *ins = malloc(24*sizeof(char));
-        if (!ins) { perror("malloc"); exit(1); }
-        char am_string[13] = {0};
-        opcode = bus_read(addr);
-        op_t op = ops[opcode];
-        am = op.addr_mode;
-        int addr_inc = 0;
-
-        if (am == am_imp) {
-            if (opcode == 0x0A || opcode == 0x2A || opcode == 0x4A || opcode == 0x6A) {
-                snprintf(am_string, 13, "A"); 
-            }
-            addr_inc = 1;
-
-        } else if (am == am_abs) {
-            snprintf(am_string, 13, "$%.2X%.2X,X", bus_read(addr+2), bus_read(addr+1));
-            addr_inc = 3;
-
-        } else if (am == am_abx) {
-            snprintf(am_string, 13, "$%.2X%.2X,X", bus_read(addr+2), bus_read(addr+1));
-            addr_inc = 3;
-
-        } else if (am == am_aby) {
-            snprintf(am_string, 13, "$%.2X%.2X,Y", bus_read(addr+2), bus_read(addr+1));
-            addr_inc = 3;
-
-        } else if (am == am_imm) {
-            snprintf(am_string, 13, "#$%.2X", bus_read(addr+1));
-            addr_inc = 2;
-            
-        } else if (am == am_ind) {
-            snprintf(am_string, 13, "($%.2X%.2X)", bus_read(addr+2), bus_read(addr+1));
-            addr_inc = 3;
-            
-        } else if (am == am_x_ind) {
-            snprintf(am_string, 13, "($%.2X,X)", bus_read(addr+1));
-            addr_inc = 2;
-            
-        } else if (am == am_ind_y) {
-            snprintf(am_string, 13, "($%.2X),Y", bus_read(addr+1));
-            addr_inc = 2;
-            
-        } else if (am == am_rel) {
-            snprintf(am_string, 13, "$%.2X", bus_read(addr+1));
-            addr_inc = 2;
-            
-        } else if (am == am_zpg) {
-            snprintf(am_string, 13, "$%.2X", bus_read(addr+1));
-            addr_inc = 2;
-            
-        } else if (am == am_zpx) {
-            snprintf(am_string, 13, "$%.2X,X", bus_read(addr+1));
-            addr_inc = 2;
-            
-        } else if (am == am_zpy) {
-            snprintf(am_string, 13, "$%.2X,Y", bus_read(addr+1));
-            addr_inc = 2;
-        }
-
-        snprintf(ins, 24, "$%.4X: %3s %s", addr, op.name, am_string);
-
-        hmput(dasm, addr, ins);
-        addr += addr_inc;
-    }
-
-    return dasm;
+void cache_ins_addr(uint16_t addr) {
+	cached_ins_addrs[cached_ins_index] = addr;
+	cached_ins_index = (cached_ins_index+1) % MAX_CACHED_INS;
 }
+
+uint16_t get_cached_ins_addr_at(int num_prev_ins) {
+	assert(num_prev_ins < MAX_CACHED_INS);
+	int virtual_index = cached_ins_index - num_prev_ins;
+	int index = virtual_index < 0 ? MAX_CACHED_INS + virtual_index : virtual_index;
+	return cached_ins_addrs[index];
+}
+
+void init_cached_ins_addrs(cpu_t *cpu) {
+	// save cpu state 
+	cpu_t cpu_state;
+	memcpy(&cpu_state, cpu, sizeof(cpu_t));
+
+	for (int i=0; i<MAX_CACHED_INS; ++i) {
+		cache_ins_addr(cpu->pc);
+
+        cpu->opcode = bus_read(cpu->pc++);
+        op_t op = ops[cpu->opcode];
+        cpu->op_cycles = op.cycles;
+
+        uint16_t addr; 
+        op.addr_mode(cpu, &addr);
+        op.execute(cpu, addr);
+	}
+
+	// restore cpu state
+	memcpy(cpu, &cpu_state, sizeof(cpu_t));
+}
+
+/****************************************************************************/
+/* disassemble */
+/****************************************************************************/
+char *disassemble_instruction(Arena *arena, uint16_t *addr) {
+	char *ins = arena_alloc(arena, 24);
+	char am_string[13] = {0};
+	uint8_t opcode = bus_read(*addr);
+	op_t op = ops[opcode];
+    uint8_t (*am)(cpu_t *cpu, uint16_t *addr) = op.addr_mode;
+	int addr_inc = 0;
+
+	if (am == am_imp) {
+		if (opcode == 0x0A || opcode == 0x2A || opcode == 0x4A || opcode == 0x6A) {
+			snprintf(am_string, 13, "A"); 
+		}
+		addr_inc = 1;
+	} else if (am == am_abs) {
+		snprintf(am_string, 13, "$%.2X%.2X", bus_read(*addr+2), bus_read(*addr+1));
+		addr_inc = 3;
+	} else if (am == am_abx) {
+		snprintf(am_string, 13, "$%.2X%.2X,X", bus_read(*addr+2), bus_read(*addr+1));
+		addr_inc = 3;
+	} else if (am == am_aby) {
+		snprintf(am_string, 13, "$%.2X%.2X,Y", bus_read(*addr+2), bus_read(*addr+1));
+		addr_inc = 3;
+	} else if (am == am_imm) {
+		snprintf(am_string, 13, "#$%.2X", bus_read(*addr+1));
+		addr_inc = 2;
+	} else if (am == am_ind) {
+		snprintf(am_string, 13, "($%.2X%.2X)", bus_read(*addr+2), bus_read(*addr+1));
+		addr_inc = 3;
+	} else if (am == am_x_ind) {
+		snprintf(am_string, 13, "($%.2X,X)", bus_read(*addr+1));
+		addr_inc = 2;
+	} else if (am == am_ind_y) {
+		snprintf(am_string, 13, "($%.2X),Y", bus_read(*addr+1));
+		addr_inc = 2;
+	} else if (am == am_rel) {
+		snprintf(am_string, 13, "$%.2X", bus_read(*addr+1));
+		addr_inc = 2;
+	} else if (am == am_zpg) {
+		snprintf(am_string, 13, "$%.2X", bus_read(*addr+1));
+		addr_inc = 2;
+	} else if (am == am_zpx) {
+		snprintf(am_string, 13, "$%.2X,X", bus_read(*addr+1));
+		addr_inc = 2;
+	} else if (am == am_zpy) {
+		snprintf(am_string, 13, "$%.2X,Y", bus_read(*addr+1));
+		addr_inc = 2;
+	} else {
+		assert(0);
+	}
+
+	snprintf(ins, 24, "$%.4X: %3s %s", *addr, op.name, am_string);
+	*addr += addr_inc;
+	return ins;
+}
+
+char **disassemble_n_instructions(Arena *arena, uint16_t start, int n) {
+    uint16_t addr = start;
+	char **lines = arena_alloc(arena, n * sizeof(char*));
+
+	for (int i=0; i < n; ++i) {
+		lines[i] = disassemble_instruction(arena, &addr);
+	}
+
+    return lines;
+}
+
+char **disassemble_n_cached_instructions(Arena *arena, int n) {
+	char **lines = arena_alloc(arena, n * sizeof(char*));
+
+	for (int i=0; i < n; ++i) {
+		int offset = n - i;
+		uint16_t addr = get_cached_ins_addr_at(offset);
+		lines[i] = disassemble_instruction(arena, &addr);
+	}
+
+    return lines;
+}
+
 
 
 #ifdef DEBUG_LOG
@@ -1150,8 +1192,14 @@ void print_cpu_state(cpu_t *cpu) {
         (cpu->status >> 0) & 1);
 }
 
+/****************************************************************************/
+/* main cpu tick */
+/****************************************************************************/
 void cpu_tick(cpu_t *cpu) {
     if (cpu->op_cycles == 0) {
+		// cache prev instruction address
+		cache_ins_addr(cpu->pc);
+
         cpu->opcode = bus_read(cpu->pc++);
         op_t op = ops[cpu->opcode];
         cpu->op_cycles = op.cycles;

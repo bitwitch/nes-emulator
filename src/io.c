@@ -372,7 +372,10 @@ void io_render_sprites(void) {
     for (int i=0; i<sprite_count; ++i) {
         sprite_t *s = sprites[i];
         SDL_UpdateTexture(s->texture, NULL, s->pixels, s->w * sizeof(uint32_t));
-        SDL_RenderCopy(renderer, s->texture, &s->srcrect, &s->dstrect);
+		SDL_Rect *dstrect = NULL;
+		if (s->dstrect.w != 0 && s->dstrect.h != 0)
+			dstrect = &s->dstrect;
+        SDL_RenderCopy(renderer, s->texture, &s->srcrect, dstrect);
     }
 
 	if (debug_window) {

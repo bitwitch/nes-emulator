@@ -11,8 +11,8 @@
 #include <SDL2/SDL_audio.h>
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
-#define STB_DS_IMPLEMENTATION
-#include "stb_ds.h"
+// #define STB_DS_IMPLEMENTATION
+// #include "stb_ds.h"
 
 #include "cpu_6502.h"
 #include "bus.h"
@@ -22,6 +22,7 @@
 #include "ppu.h"
 #include "apu.h"
 
+#include "common.c"
 #include "cpu_6502.c"
 #include "bus.c"
 #include "mappers.c"
@@ -31,10 +32,10 @@
 #include "apu.c"
 
 #define MS_PER_FRAME (1000/60)
-
 #define MAX_CPU_STATE_LINES 36
 #define MAX_DEBUG_LINE_CHARS 34
 #define MAX_CODE_LINES 14
+
 
 typedef enum {
     EM_RUN,
@@ -49,12 +50,18 @@ extern FILE *logfile;
 static char *cpu_state_lines[MAX_CPU_STATE_LINES];
 static sprite_t pattern_tables[2];
 static sprite_t palettes[8];
+static uint64_t elapsed_time, last_frame_time;
+static bool frame_prepared;
 
 
+char **get_dasm_lines(Arena *arena, uint16_t pc);
 void init_debug_chr_viewer(sprite_t pattern_tables[2], sprite_t palettes[8]);
 void render_cpu_state(cpu_t *cpu, char **cpu_state_lines);
-void render_code(uint16_t addr, dasm_map_t *dasm);
+void render_code(uint16_t pc, char **lines, int num_lines);
 void render_oam_info(void);
+void emulation_mode_run(cpu_t *cpu);
+void emulation_mode_step_instruction(cpu_t *cpu);
+void emulation_mode_step_frame(cpu_t *cpu);
 
 int main(int argc, char **argv) {
     if (argc < 2) {
@@ -66,8 +73,6 @@ int main(int argc, char **argv) {
     read_rom_file(argv[1]);
     io_init();
 
-    /* LEAK: disassemble allocates memory for strings */
-    dasm_map_t *dasm = disassemble(0x8000, 0xFFFF);
 
     /* LEAK: 
      * All of the malloc calls for sprite pixels are leaking. since the memory
@@ -88,7 +93,7 @@ int main(int argc, char **argv) {
 		PPU_WIDTH, PPU_HEIGHT, 
         horizontal_overscan, vertical_overscan, 
 		NES_WIDTH, NES_HEIGHT,
-        0, 0, NES_WIDTH*SCALE, NES_HEIGHT*SCALE);
+        0, 0, 0, 0); // all zeros means use entire render target
     register_sprite(&nes_quad, WIN_NES);
 
     ppu_init(nes_quad.pixels);
@@ -99,16 +104,20 @@ int main(int argc, char **argv) {
     logfile = fopen("nestest.log", "w");
 #endif
 
-    bool frame_prepared = false;
-    uint64_t elapsed_time = 0;
-    uint64_t last_frame_time = get_ticks();
-    /*emulation_mode_t emulation_mode = EM_STEP_INSTRUCTION;*/
+	Arena dasm_arena = {0};
+	arena_grow(&dasm_arena, ARENA_BLOCK_SIZE); // initialize so that we can call arena_get_pos()
+	init_cached_ins_addrs(&cpu);
+
+    frame_prepared = false;
+    elapsed_time = 0;
+    last_frame_time = get_ticks();
     emulation_mode_t emulation_mode = EM_RUN;
 
     for (;;) {
         last_platform_state = platform_state;
         do_input();
 
+	
 		// activate debug window
 		if (platform_state.tilde) {
 			SDL_Window *debug_window = io_get_window(WIN_DEBUG);
@@ -123,7 +132,7 @@ int main(int argc, char **argv) {
 			}
 		}
 
-        /* transfer states */
+        // transfer states
         if (platform_state.enter && !last_platform_state.enter)
             emulation_mode = EM_RUN;
         else if (platform_state.space && !last_platform_state.space)
@@ -131,143 +140,41 @@ int main(int argc, char **argv) {
         else if (platform_state.f && !last_platform_state.f)
             emulation_mode = EM_STEP_FRAME;
 
+		// emulate
         switch (emulation_mode) {
-        case EM_RUN:
-        {
-            /* update */
-            if (apu_request_frame()) {
-                while (!ppu_frame_completed()) {
-                    if (cpu.op_cycles == 0 && ppu_nmi())  {
-                        cpu_nmi(&cpu);
-                        ppu_clear_nmi();
-                    }
-                    cpu_tick(&cpu);
-                    apu_tick();
-                    ppu_tick(); ppu_tick(); ppu_tick();
-                }
-                
-                ppu_clear_frame_completed();
-                apu_flush_sound_buffer();
-                frame_prepared = true;
-
-				if (io_get_window(WIN_DEBUG)) {
-					update_pattern_tables(0, pattern_tables);
-					update_palettes(palettes);
-				}
-            }
-
-            /* render */
-            elapsed_time = get_ticks() - last_frame_time;
-            if ((elapsed_time >= MS_PER_FRAME) && frame_prepared) {
-                io_render_prepare();
-                io_render_sprites();
-                render_cpu_state(&cpu, cpu_state_lines);
-                render_code(cpu.pc, dasm);
-                /*render_oam_info();*/
-
-                /*apu_render_sound_wave();*/
-
-                io_render_present();
-
-                frame_prepared = false;
-                last_frame_time += MS_PER_FRAME;
-
-                /* NOTE(shaw): since get_ticks is a uint64_t and only has
-                 * millisecond precision, the MS_PER_FRAME will be truncated to
-                 * 16ms so fps will actually be 62.5 instead of 60 */
-            }
-
-            break;
-        }
-
-        case EM_STEP_INSTRUCTION:
-        {
-            /* update */
-            if (platform_state.space && !last_platform_state.space) {
-                if (cpu.op_cycles == 0 && ppu_nmi()) {
-                    cpu_nmi(&cpu);
-                    ppu_clear_nmi();
-                }
-                do {
-                    cpu_tick(&cpu);
-                    apu_tick();
-                    ppu_tick(); ppu_tick(); ppu_tick();
-                } while (cpu.op_cycles > 0);
-
-                if (ppu_frame_completed()) {
-                    ppu_clear_frame_completed();
-                    apu_flush_sound_buffer();
-                }
-
-				if (io_get_window(WIN_DEBUG)) {
-					update_pattern_tables(0, pattern_tables);
-					update_palettes(palettes);
-				}
-            }
-
-            /* render */
-            elapsed_time = get_ticks() - last_frame_time;
-            if (elapsed_time >= MS_PER_FRAME) {
-                io_render_prepare();
-                io_render_sprites();
-                render_cpu_state(&cpu, cpu_state_lines);
-                render_code(cpu.pc, dasm);
-                /*render_oam_info();*/
-                /*apu_render_sound_wave();*/
-                io_render_present();
-                last_frame_time += MS_PER_FRAME;
-            }
-
-            break;
-        }
-
-        case EM_STEP_FRAME:
-        {
-            /* update */
-            if (!frame_prepared && platform_state.f && !last_platform_state.f) {
-                while (!ppu_frame_completed()) {
-                    if (cpu.op_cycles == 0 && ppu_nmi()) {
-                        cpu_nmi(&cpu);
-                        ppu_clear_nmi();
-                    }
-                    cpu_tick(&cpu);
-                    apu_tick();
-                    ppu_tick(); ppu_tick(); ppu_tick();
-                }
-                
-                ppu_clear_frame_completed();
-                apu_flush_sound_buffer();
-                frame_prepared = true;
-
-				if (io_get_window(WIN_DEBUG)) {
-					update_pattern_tables(0, pattern_tables);
-					update_palettes(palettes);
-				}
-            }
-
-            /* render */
-            elapsed_time = get_ticks() - last_frame_time;
-            if ((elapsed_time >= MS_PER_FRAME) && frame_prepared) {
-                io_render_prepare();
-                io_render_sprites();
-                render_cpu_state(&cpu, cpu_state_lines);
-                render_code(cpu.pc, dasm);
-                /*render_oam_info();*/
-                /*apu_render_sound_wave();*/
-                io_render_present();
-
-                frame_prepared = false;
-                last_frame_time += MS_PER_FRAME;
-            }
-
-            break;
-        }
-
+        case EM_RUN:              emulation_mode_run(&cpu);              break;
+        case EM_STEP_INSTRUCTION: emulation_mode_step_instruction(&cpu); break;
+        case EM_STEP_FRAME:       emulation_mode_step_frame(&cpu);       break;
         default:
             assert(0 && "Unknown emulation mode");
             break;
         }
 
+		// disassemble
+		char *pos = arena_get_pos(&dasm_arena);
+		char **dasm_lines = get_dasm_lines(&dasm_arena, cpu.pc);
+
+
+		// render
+		elapsed_time = get_ticks() - last_frame_time;
+		if (elapsed_time >= MS_PER_FRAME) {
+			if (emulation_mode == EM_STEP_INSTRUCTION || frame_prepared) {
+				io_render_prepare();
+				io_render_sprites();
+				render_cpu_state(&cpu, cpu_state_lines);
+				render_code(cpu.pc, dasm_lines, MAX_CODE_LINES);
+				io_render_present();
+				if (emulation_mode == EM_RUN || emulation_mode == EM_STEP_FRAME)
+					frame_prepared = false;
+				last_frame_time += MS_PER_FRAME;
+
+				// NOTE(shaw): since get_ticks is a uint64_t and only has
+				// millisecond precision, the MS_PER_FRAME will be truncated to
+				// 16ms so fps will actually be 62.5 instead of 60
+			}
+		}
+
+		arena_set_pos(&dasm_arena, pos);
     }
 
     /* just let OS clean it up
@@ -280,6 +187,79 @@ int main(int argc, char **argv) {
 #endif
 
     return 0;
+}
+
+void emulation_mode_run(cpu_t *cpu) {
+	/* update */
+	if (apu_request_frame()) {
+		while (!ppu_frame_completed()) {
+			if (cpu->op_cycles == 0 && ppu_nmi())  {
+				cpu_nmi(cpu);
+				ppu_clear_nmi();
+			}
+			cpu_tick(cpu);
+			apu_tick();
+			ppu_tick(); ppu_tick(); ppu_tick();
+		}
+
+		ppu_clear_frame_completed();
+		apu_flush_sound_buffer();
+		frame_prepared = true;
+
+		if (io_get_window(WIN_DEBUG)) {
+			update_pattern_tables(0, pattern_tables);
+			update_palettes(palettes);
+		}
+	}
+}
+
+void emulation_mode_step_instruction(cpu_t *cpu) {
+	/* update */
+	if (platform_state.space && !last_platform_state.space) {
+		if (cpu->op_cycles == 0 && ppu_nmi()) {
+			cpu_nmi(cpu);
+			ppu_clear_nmi();
+		}
+		do {
+			cpu_tick(cpu);
+			apu_tick();
+			ppu_tick(); ppu_tick(); ppu_tick();
+		} while (cpu->op_cycles > 0);
+
+		if (ppu_frame_completed()) {
+			ppu_clear_frame_completed();
+			apu_flush_sound_buffer();
+		}
+
+		if (io_get_window(WIN_DEBUG)) {
+			update_pattern_tables(0, pattern_tables);
+			update_palettes(palettes);
+		}
+	}
+}
+
+void emulation_mode_step_frame(cpu_t *cpu) {
+	/* update */
+	if (!frame_prepared && platform_state.f && !last_platform_state.f) {
+		while (!ppu_frame_completed()) {
+			if (cpu->op_cycles == 0 && ppu_nmi()) {
+				cpu_nmi(cpu);
+				ppu_clear_nmi();
+			}
+			cpu_tick(cpu);
+			apu_tick();
+			ppu_tick(); ppu_tick(); ppu_tick();
+		}
+
+		ppu_clear_frame_completed();
+		apu_flush_sound_buffer();
+		frame_prepared = true;
+
+		if (io_get_window(WIN_DEBUG)) {
+			update_pattern_tables(0, pattern_tables);
+			update_palettes(palettes);
+		}
+	}
 }
 
 void init_debug_chr_viewer(sprite_t pattern_tables[2], sprite_t palettes[8]) {
@@ -316,6 +296,20 @@ void init_debug_chr_viewer(sprite_t pattern_tables[2], sprite_t palettes[8]) {
             (int)pal_height);                                   /* dest height */
         register_sprite(&palettes[i], WIN_DEBUG);
     }
+}
+
+char **get_dasm_lines(Arena *arena, uint16_t pc) {
+	int lines_above    = MAX_CODE_LINES/2 - (MAX_CODE_LINES%2 == 0);
+	int lines_from_cur = MAX_CODE_LINES - lines_above;
+
+	char **dasm_prev   = disassemble_n_cached_instructions(arena, lines_above);
+	char **dasm_future = disassemble_n_instructions(arena, pc, lines_from_cur);
+
+	char **dasm_lines = arena_alloc(arena, MAX_CODE_LINES * sizeof(char*));
+	memcpy(dasm_lines, dasm_prev, lines_above * sizeof(char*));
+	memcpy(dasm_lines+lines_above, dasm_future, lines_from_cur * sizeof(char*));
+
+	return dasm_lines;
 }
 
 void render_cpu_state(cpu_t *cpu, char **lines) {
@@ -360,24 +354,14 @@ void render_oam_info(void) {
     }
 }
 
-void render_code(uint16_t addr, dasm_map_t *dasm) {
-    int ins_index = hmgeti(dasm, addr);
-    int max_index = ins_index + MAX_CODE_LINES/2;
-    if (max_index >= hmlen(dasm)) max_index = hmlen(dasm)-1;
-    int min_index = max_index - (MAX_CODE_LINES-1); 
-    if (min_index < 0) min_index = 0;
-
+void render_code(uint16_t pc, char **lines, int num_lines) {
     int pad = (int)(0.0133333 * DEBUG_WINDOW_WIDTH);
-    for (int i=min_index; i<=max_index; ++i) {
-        if (i == ins_index)
-            render_text_color(WIN_DEBUG, dasm[i].value, 
-				pad,
-                (int)((i-min_index)*FONT_CHAR_HEIGHT*FONT_SCALE + 7*FONT_CHAR_HEIGHT*FONT_SCALE + pad),
-                0xFFA7ED);
-        else
-            render_text(WIN_DEBUG, dasm[i].value, 
-				pad,
-                (int)((i-min_index)*FONT_CHAR_HEIGHT*FONT_SCALE + 7*FONT_CHAR_HEIGHT*FONT_SCALE + pad));
-    }
+	int current_ins = MAX_CODE_LINES/2 - (MAX_CODE_LINES%2 == 0);
+	for (int i=0; i<num_lines; ++i) {
+		render_text_color(WIN_DEBUG, lines[i],
+			pad,
+			(int)(i*FONT_CHAR_HEIGHT*FONT_SCALE + 7*FONT_CHAR_HEIGHT*FONT_SCALE + 2*pad),
+			i == current_ins ? 0xFFA7ED : 0xFFFFFF);
+	}
 }
 
