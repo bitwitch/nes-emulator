@@ -70,6 +70,9 @@ void io_init_window(window_state_t *window, char *name, int width, int height) {
 
 	// Load True Type Font
 	window->font = STBTTF_OpenFont(window->renderer, "c:/windows/fonts/consola.ttf", 20);
+
+	window->width = width;
+	window->height = height;
 }
 
 
@@ -77,6 +80,8 @@ void io_init_window(window_state_t *window, char *name, int width, int height) {
  * input states up to date in platform_state */
 void do_input() {
     SDL_Event event;
+
+	platform_state.wheel_y = 0; // reset scroll wheel
 
     while (SDL_PollEvent(&event)) {
         switch (event.type) {
@@ -105,6 +110,10 @@ void do_input() {
                 do_controller_input(&event.cbutton);
                 break;
 
+			case SDL_MOUSEWHEEL:
+				platform_state.wheel_y = event.wheel.y;
+				break;
+             
             default:
                 break;
         }
@@ -266,7 +275,6 @@ static void do_controller_input(SDL_ControllerButtonEvent *event) {
             break;
     }
 }
-
 
 void controller_write(int controller_index, uint8_t data) {
     assert(controller_index == 0 || controller_index == 1);

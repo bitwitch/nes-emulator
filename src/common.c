@@ -1,4 +1,6 @@
 #define array_count(a) sizeof(a)/sizeof(*(a))
+#define MAX(x, y) ((x) >= (y) ? (x) : (y))
+#define MIN(x, y) ((x) <= (y) ? (x) : (y))
 
 void *xmalloc(size_t size) {
     void *ptr = malloc(size);
@@ -46,8 +48,6 @@ typedef struct {
 	size_t cap;
 	char buf[]; // flexible array member
 } DA_Header;
-
-#define MAX(x, y) ((x) >= (y) ? (x) : (y))
 
 // get the metadata of the array which is stored before the actual buffer in memory
 #define da__header(b) ((DA_Header*)((char*)b - offsetof(DA_Header, buf)))

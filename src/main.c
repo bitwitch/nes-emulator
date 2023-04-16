@@ -72,6 +72,7 @@ void render_memory(void);
 void emulation_mode_run(cpu_t *cpu);
 void emulation_mode_step_instruction(cpu_t *cpu);
 void emulation_mode_step_frame(cpu_t *cpu);
+void update_memory_window(void);
 
 int main(int argc, char **argv) {
     if (argc < 2) {
@@ -142,15 +143,8 @@ int main(int argc, char **argv) {
 			}
 		}
 
-		// activate memory window
-		if (platform_state.m) {
-			if (!memory_window.window) {
-				io_init_window(&memory_window, "NES Memory", (int)MEMORY_WINDOW_WIDTH, (int)MEMORY_WINDOW_HEIGHT);
-			} else {
-				SDL_ShowWindow(memory_window.window);
-				SDL_RaiseWindow(memory_window.window);
-			}
-		}
+		// activate and update memory window
+		update_memory_window();
 
         // transfer states
         if (platform_state.enter && !last_platform_state.enter)
@@ -181,9 +175,14 @@ int main(int argc, char **argv) {
 				io_render_prepare();
 
 				io_render_sprites();
-				render_cpu_state(&cpu, cpu_state_lines);
-				render_code(cpu.pc, dasm_lines, MAX_CODE_LINES);
-				render_memory();
+
+				if (debug_window.window) {
+					render_cpu_state(&cpu, cpu_state_lines);
+					render_code(cpu.pc, dasm_lines, MAX_CODE_LINES);
+				}
+
+				if (memory_window.window)
+					render_memory();
 
 				io_render_present();
 
@@ -389,23 +388,70 @@ void render_code(uint16_t pc, char **lines, int num_lines) {
 }
 
 
-#define MAX_LINE_LEN 64
+#define MAX_LINE_LEN 74
 void render_memory(void) {
 	char buffer[MAX_LINE_LEN];
 	int line_num = 0;
 	int pad = 15;
-	for (uint16_t addr = 0; addr < 16*64; addr += 16) {
+	int line_height = FONT_CHAR_HEIGHT*FONT_SCALE;
+	int num_visible_lines = (memory_window.height / line_height) - 1;
+	uint16_t start = 16 * (uint16_t)(memory_window.scroll_y / line_height);
+	start = MIN(start, 0xFFF0 - 16*num_visible_lines);
+	uint16_t end = start + 16*num_visible_lines;
+
+	for (uint16_t addr = start; addr >= start && addr <= end; addr += 16) {
+		uint8_t bytes[16];
+		char displays[17];
+		for (int i=0; i<16; ++i) {
+			bytes[i] = bus_read(addr+i);
+			displays[i] = isprint(bytes[i]) ? bytes[i] : '.';
+		}
+		displays[16] = 0;
+
 		snprintf(buffer, MAX_LINE_LEN, 
-			"%04X: %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X",
-			addr, bus_read(addr), bus_read(addr+1), bus_read(addr+2), bus_read(addr+3),
-			bus_read(addr+4), bus_read(addr+5), bus_read(addr+6), bus_read(addr+7),
-			bus_read(addr+8), bus_read(addr+9), bus_read(addr+10), bus_read(addr+11),
-			bus_read(addr+12), bus_read(addr+13), bus_read(addr+14), bus_read(addr+15));
+			"%04X: %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X |%s|",
+			addr, bytes[0], bytes[1], bytes[2], bytes[3],
+			bytes[4], bytes[5], bytes[6], bytes[7],
+			bytes[8], bytes[9], bytes[10], bytes[11],
+			bytes[12], bytes[13], bytes[14], bytes[15],
+			displays);
+			
 		render_text(&memory_window, buffer, 
 			pad,
-            (int)(line_num*FONT_CHAR_HEIGHT*FONT_SCALE + 2*pad));
+            line_num*line_height + line_height);
 		++line_num;
 	}
 }
 #undef MAX_LINE_LEN
 
+#define SCROLL_MULTIPLIER 40
+void update_memory_window(void) {
+	// activate memory window
+	if (platform_state.m) {
+		if (!memory_window.window) {
+			io_init_window(&memory_window, "NES Memory", (int)MEMORY_WINDOW_WIDTH, (int)MEMORY_WINDOW_HEIGHT);
+
+			// hardcoded amount that results in addr 0xFFF0 displaying at the bottom of the window
+			// this assumes the font Consolas and font size 20
+			memory_window.max_scroll_y = 73080; 
+		} else {
+			SDL_ShowWindow(memory_window.window);
+			SDL_RaiseWindow(memory_window.window);
+		}
+	}
+
+	// bail if window hasn't been initialized or isn't in focus
+	if (!memory_window.window) return;
+	if (!(SDL_GetWindowFlags(memory_window.window) & SDL_WINDOW_INPUT_FOCUS)) return;
+
+	// mousewheel scrolling
+	if (platform_state.wheel_y) {
+		memory_window.scroll_y -= platform_state.wheel_y * SCROLL_MULTIPLIER;
+		if (memory_window.scroll_y < 0)
+			memory_window.scroll_y = 0;
+		else if (memory_window.scroll_y > memory_window.max_scroll_y) 
+			memory_window.scroll_y = memory_window.max_scroll_y;
+		printf("%d\n", memory_window.scroll_y);
+	}
+}
+#undef SCROLL_MULTIPLIER
