@@ -98,12 +98,12 @@ int main(int argc, char **argv) {
     if (!pixels) { perror("malloc"); exit(1); }
     int vertical_overscan = (int)(0.5*(PPU_HEIGHT - NES_HEIGHT));
     int horizontal_overscan = (int)(0.5*(PPU_WIDTH - NES_WIDTH));
-    sprite_t nes_quad = make_sub_sprite(WIN_NES, pixels, 
+    sprite_t nes_quad = make_sub_sprite(&nes_window, pixels, 
 		PPU_WIDTH, PPU_HEIGHT, 
         horizontal_overscan, vertical_overscan, 
 		NES_WIDTH, NES_HEIGHT,
         0, 0, 0, 0); // all zeros means use entire render target
-    register_sprite(&nes_quad, WIN_NES);
+    register_sprite(&nes_window, &nes_quad);
 
     ppu_init(nes_quad.pixels);
 
@@ -132,15 +132,14 @@ int main(int argc, char **argv) {
 	
 		// activate debug window
 		if (platform_state.tilde) {
-			SDL_Window *debug_window = io_get_window(WIN_DEBUG);
-			if (!debug_window) {
+			if (!debug_window.window) {
 				io_init_debug_window();
 				init_debug_chr_viewer(pattern_tables, palettes);
 				update_pattern_tables(0, pattern_tables);
 				update_palettes(palettes);
 			} else {
-				SDL_ShowWindow(debug_window);
-				SDL_RaiseWindow(debug_window);
+				SDL_ShowWindow(debug_window.window);
+				SDL_RaiseWindow(debug_window.window);
 			}
 		}
 
@@ -218,7 +217,7 @@ void emulation_mode_run(cpu_t *cpu) {
 		apu_flush_sound_buffer();
 		frame_prepared = true;
 
-		if (io_get_window(WIN_DEBUG)) {
+		if (debug_window.window) {
 			update_pattern_tables(0, pattern_tables);
 			update_palettes(palettes);
 		}
@@ -243,7 +242,7 @@ void emulation_mode_step_instruction(cpu_t *cpu) {
 			apu_flush_sound_buffer();
 		}
 
-		if (io_get_window(WIN_DEBUG)) {
+		if (debug_window.window) {
 			update_pattern_tables(0, pattern_tables);
 			update_palettes(palettes);
 		}
@@ -267,7 +266,7 @@ void emulation_mode_step_frame(cpu_t *cpu) {
 		apu_flush_sound_buffer();
 		frame_prepared = true;
 
-		if (io_get_window(WIN_DEBUG)) {
+		if (debug_window.window) {
 			update_pattern_tables(0, pattern_tables);
 			update_palettes(palettes);
 		}
@@ -284,13 +283,13 @@ void init_debug_chr_viewer(sprite_t pattern_tables[2], sprite_t palettes[8]) {
     for (int i=0; i<2; ++i) {
         uint32_t *pixels = malloc(128*128*sizeof(uint32_t));
         if (!pixels) { perror("malloc"); exit(1); }
-        pattern_tables[i] = make_sprite(WIN_DEBUG, pixels, 
+        pattern_tables[i] = make_sprite(&debug_window, pixels, 
 			128, 128, 
             (int)(pad + i*(pat_width+pad)), /* dest x */
             (int)y_pos,                                         /* dest y */
             (int)pat_width,                                     /* dest width */
             (int)pat_width);                                    /* dest height */
-        register_sprite(&pattern_tables[i], WIN_DEBUG);
+        register_sprite(&debug_window, &pattern_tables[i]);
     }
 
     /* palettes */
@@ -300,13 +299,13 @@ void init_debug_chr_viewer(sprite_t pattern_tables[2], sprite_t palettes[8]) {
     for (int i=0; i<8; ++i) {
         uint32_t *pixels = malloc(4*1*sizeof(uint32_t));
         if (!pixels) { perror("malloc"); exit(1); }
-        palettes[i] = make_sprite(WIN_DEBUG, pixels, 
+        palettes[i] = make_sprite(&debug_window, pixels, 
 			4, 1, 
             (int)(pad + i*(pal_width+pad)), /* dest x */
             (int)y_pos,                                         /* dest y */
             (int)pal_width,                                     /* dest width */
             (int)pal_height);                                   /* dest height */
-        register_sprite(&palettes[i], WIN_DEBUG);
+        register_sprite(&debug_window, &palettes[i]);
     }
 }
 
@@ -340,7 +339,7 @@ void render_cpu_state(cpu_t *cpu, char **lines) {
     for (int i=0; i<MAX_CPU_STATE_LINES; ++i) {
         char *line = lines[i];
         if (line == NULL) break;
-        render_text(WIN_DEBUG, line, 
+        render_text(&debug_window, line, 
         	pad, 
         	(int)(i*FONT_CHAR_HEIGHT*FONT_SCALE + 3*pad));
     }
@@ -360,7 +359,7 @@ void render_oam_info(void) {
         x       = oam[i*4+3];
         
         snprintf(line, MAX_DEBUG_LINE_CHARS+1, "(%3d,%3d) %2X %2X", x,y,tile_id,attr);
-        render_text(WIN_DEBUG, line, 
+        render_text(&debug_window, line, 
 			pad,
             (int)(i*FONT_CHAR_HEIGHT*FONT_SCALE + 7*FONT_CHAR_HEIGHT*FONT_SCALE + pad));
     }
@@ -370,7 +369,7 @@ void render_code(uint16_t pc, char **lines, int num_lines) {
     int pad = (int)(0.0133333 * DEBUG_WINDOW_WIDTH);
 	int current_ins = MAX_CODE_LINES/2 - (MAX_CODE_LINES%2 == 0);
 	for (int i=0; i<num_lines; ++i) {
-		render_text_color(WIN_DEBUG, lines[i],
+		render_text_color(&debug_window, lines[i],
 			pad,
 			(int)(i*FONT_CHAR_HEIGHT*FONT_SCALE + 7*FONT_CHAR_HEIGHT*FONT_SCALE + 4*pad),
 			i == current_ins ? 0xFFA7ED : 0xFFFFFF);

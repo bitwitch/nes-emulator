@@ -17,10 +17,7 @@
 #define FONT_CHAR_HEIGHT 9
 #define FONT_SCALE 2
 
-typedef enum {
-	WIN_NES,
-	WIN_DEBUG,
-} WindowId;
+#define MAX_WINDOW_SPRITES 16
 
 typedef struct {
     SDL_Texture *texture;
@@ -29,6 +26,15 @@ typedef struct {
     int w, h;
     SDL_Rect srcrect, dstrect;
 } sprite_t;
+
+typedef struct {
+	SDL_Window *window;
+	SDL_Renderer *renderer;
+	STBTTF_Font* font;
+	sprite_t *sprites[MAX_WINDOW_SPRITES];
+	int sprite_count;
+	bool hidden; 
+} window_state_t; 
 
 typedef struct {
     bool enter;
@@ -52,6 +58,7 @@ typedef enum {
     CONTROLLER_RIGHT  = 1 << 0
 } controller_buttons_t;
 
+extern window_state_t nes_window, debug_window, memory_window;
 extern platform_state_t platform_state;
 extern platform_state_t last_platform_state;
 extern uint8_t controller_registers[2]; /* parallel to serial shift registers */
@@ -60,7 +67,6 @@ void io_init(void);
 void io_deinit(void);
 void io_init_debug_window(void);
 void io_destroy_debug_window(void);
-SDL_Window *io_get_window(WindowId wid);
 void io_render_prepare(void);
 void io_render_sprites(void);
 void io_render_present(void);
@@ -68,15 +74,14 @@ uint64_t get_ticks(void);
 void controller_write(int controller_index, uint8_t data);
 uint8_t controller_read(int controller_index);
 void do_input();
-sprite_t make_sprite(WindowId wid, uint32_t *pixels, int w, int h, 
+sprite_t make_sprite(window_state_t *window, uint32_t *pixels, int w, int h, 
                      int dest_x, int dest_y, int dest_w, int dest_h);
-sprite_t make_sub_sprite(WindowId wid, uint32_t *pixels, int w, int h, 
+sprite_t make_sub_sprite(window_state_t *window, uint32_t *pixels, int w, int h, 
                          int src_x, int src_y, int src_w, int src_h,
                          int dest_x, int dest_y, int dest_w, int dest_h);
-void register_sprite(sprite_t *sprite, WindowId id);
-void set_font_color(uint32_t color);
-void render_text(WindowId wid, char *text, int x, int y);
-void render_text_color(WindowId wid, char *text, int x, int y, uint32_t color_mod);
+void register_sprite(window_state_t *window, sprite_t *sprite);
+void render_text(window_state_t *window, char *text, int x, int y);
+void render_text_color(window_state_t *window, char *text, int x, int y, uint32_t color_mod);
 
 
 #endif

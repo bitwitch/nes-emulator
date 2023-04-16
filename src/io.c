@@ -1,38 +1,5 @@
-#define MAX_WINDOW_SPRITES 16
-
-static struct {
-    int w, h, bytes_per_pixel;
-    SDL_Texture *texture;
-    SDL_Rect glyphs[95];
-} font;
-
-static STBTTF_Font* tt_font;
-
-/*
-typedef struct {
-	SDL_Window *window;
-	SDL_Renderer *renderer;
-	STBTTF_Font* font;
-	sprite_t *sprites[MAX_WINDOW_SPRITES];
-	int sprite_count;
-	bool hidden; 
-} window_state_t;
-*/
-
-static SDL_Window *window;
-static SDL_Renderer *renderer;
-static SDL_GameController *controllers[2];
-
-static SDL_Window *debug_window;
-static SDL_Renderer *debug_renderer;
-
-static sprite_t *sprites[MAX_WINDOW_SPRITES];
-static int sprite_count;
-
-static sprite_t *debug_sprites[MAX_WINDOW_SPRITES];
-static int debug_sprite_count;
-
-
+window_state_t nes_window, debug_window, memory_window;
+SDL_GameController *controllers[2];
 platform_state_t platform_state;
 platform_state_t last_platform_state;
 uint8_t controller_registers[2];
@@ -47,22 +14,24 @@ void io_init(void) {
         exit(1);
     }
 
-    window = SDL_CreateWindow(
+    nes_window.window = SDL_CreateWindow(
         "NES",
         SDL_WINDOWPOS_UNDEFINED,
         SDL_WINDOWPOS_UNDEFINED,
         (int)WINDOW_WIDTH, (int)WINDOW_HEIGHT,
         SDL_WINDOW_RESIZABLE);
-    if (!window) {
+    if (!nes_window.window) {
         fprintf(stderr, "Failed to create window: %s\n", SDL_GetError());
         exit(1);
     }
 
-    renderer = SDL_CreateRenderer(window, -1, 0);
-    if (!renderer) {
+    nes_window.renderer = SDL_CreateRenderer(nes_window.window, -1, 0);
+    if (!nes_window.renderer) {
         fprintf(stderr, "Failed to create renderer: %s\n", SDL_GetError());
         exit(1);
     }
+
+	nes_window.font = STBTTF_OpenFont(nes_window.renderer, "c:/windows/fonts/consola.ttf", 20);
 
     memset(&platform_state, 0, sizeof(platform_state));
     memset(&last_platform_state, 0, sizeof(last_platform_state));
@@ -99,53 +68,27 @@ void io_init(void) {
 
 
 void io_init_debug_window(void) {
-	if (debug_window) return;
+	if (debug_window.window) return;
 
-    debug_window = SDL_CreateWindow(
+    debug_window.window = SDL_CreateWindow(
         "NES Debug",
         SDL_WINDOWPOS_UNDEFINED,
         SDL_WINDOWPOS_UNDEFINED,
         (int)DEBUG_WINDOW_WIDTH, (int)DEBUG_WINDOW_HEIGHT,
         SDL_WINDOW_RESIZABLE);
-    if (!debug_window) {
+    if (!debug_window.window) {
         fprintf(stderr, "Failed to create debug window: %s\n", SDL_GetError());
 		return;
     }
 
-    debug_renderer = SDL_CreateRenderer(debug_window, -1, 0);
-    if (!debug_renderer) {
+    debug_window.renderer = SDL_CreateRenderer(debug_window.window, -1, 0);
+    if (!debug_window.renderer) {
         fprintf(stderr, "Failed to create debug renderer: %s\n", SDL_GetError());
 		return;
     }
 
 	// Load True Type Font
-	tt_font = STBTTF_OpenFont(debug_renderer, "c:/windows/fonts/consola.ttf", 20);
-
-
-    /* Load Bitmap Font */
-    uint8_t *font_pixels = stbi_load("font.png", &font.w, &font.h, &font.bytes_per_pixel, STBI_rgb);
-    if (!font_pixels)
-        fprintf(stderr, "Failed to load font: font.png\n");
-    printf("Loaded font.png: w=%d h=%d, bytes_per_pixel=%d\n", font.w, font.h, font.bytes_per_pixel);
-
-    SDL_Surface *font_surface = SDL_CreateRGBSurfaceFrom(
-        font_pixels,
-        font.w,
-        font.h,
-        8*font.bytes_per_pixel,
-        3*font.w,
-        0, 0, 0, 0);
-    if (!font_surface) {
-        fprintf(stderr, "Creating surface failed: %s", SDL_GetError());
-        exit(1);
-    }
-
-    font.texture = SDL_CreateTextureFromSurface(debug_renderer, font_surface);
-
-    SDL_FreeSurface(font_surface);
-    stbi_image_free(font_pixels);
-
-    generate_font_glyphs();
+	debug_window.font = STBTTF_OpenFont(debug_window.renderer, "c:/windows/fonts/consola.ttf", 20);
 }
 
 /* do_input is the platform level input handler that will keep the current
@@ -157,10 +100,10 @@ void do_input() {
         switch (event.type) {
             case SDL_WINDOWEVENT:
                 if (event.window.event == SDL_WINDOWEVENT_CLOSE) {
-					if (event.window.windowID == SDL_GetWindowID(window)) {
+					if (event.window.windowID == SDL_GetWindowID(nes_window.window)) {
 						exit(0);
-					} else if (event.window.windowID == SDL_GetWindowID(debug_window)) {
-						SDL_HideWindow(debug_window);
+					} else if (event.window.windowID == SDL_GetWindowID(debug_window.window)) {
+						SDL_HideWindow(debug_window.window);
 					} else {
 						assert(0);
 					}
@@ -366,40 +309,41 @@ uint64_t get_ticks(void) {
 }
 
 void io_render_prepare(void) {
-    SDL_SetRenderDrawColor(renderer, 0x00, 0x00, 0x00, 0xFF);
-    SDL_RenderClear(renderer);
+    SDL_SetRenderDrawColor(nes_window.renderer, 0x00, 0x00, 0x00, 0xFF);
+    SDL_RenderClear(nes_window.renderer);
 
-	if (debug_window) {
-		SDL_SetRenderDrawColor(debug_renderer, 0x00, 0x00, 0x00, 0xFF);
-		SDL_RenderClear(debug_renderer);
+	if (debug_window.window) {
+		SDL_SetRenderDrawColor(debug_window.renderer, 0x00, 0x00, 0x00, 0xFF);
+		SDL_RenderClear(debug_window.renderer);
 	}
 }
 
 void io_render_sprites(void) {
-    for (int i=0; i<sprite_count; ++i) {
-        sprite_t *s = sprites[i];
+    for (int i=0; i<nes_window.sprite_count; ++i) {
+        sprite_t *s = nes_window.sprites[i];
         SDL_UpdateTexture(s->texture, NULL, s->pixels, s->w * sizeof(uint32_t));
 		SDL_Rect *dstrect = NULL;
 		if (s->dstrect.w != 0 && s->dstrect.h != 0)
 			dstrect = &s->dstrect;
-        SDL_RenderCopy(renderer, s->texture, &s->srcrect, dstrect);
+        SDL_RenderCopy(nes_window.renderer, s->texture, &s->srcrect, dstrect);
     }
 
-	if (debug_window) {
-		for (int i=0; i<debug_sprite_count; ++i) {
-			sprite_t *s = debug_sprites[i];
+	if (debug_window.window) {
+		for (int i=0; i<debug_window.sprite_count; ++i) {
+			sprite_t *s = debug_window.sprites[i];
 			SDL_UpdateTexture(s->texture, NULL, s->pixels, s->w * sizeof(uint32_t));
-			SDL_RenderCopy(debug_renderer, s->texture, &s->srcrect, &s->dstrect);
+			SDL_RenderCopy(debug_window.renderer, s->texture, &s->srcrect, &s->dstrect);
 		}
 	}
 }
 
 void io_render_present(void) {
-    SDL_RenderPresent(renderer);
-	if (debug_window)
-		SDL_RenderPresent(debug_renderer);
+    SDL_RenderPresent(nes_window.renderer);
+	if (debug_window.window)
+		SDL_RenderPresent(debug_window.renderer);
 }
 
+/*
 static void generate_font_glyphs(void) {
     for (int i=0; i<95; ++i) {
         int col = i % (font.w/FONT_CHAR_WIDTH);
@@ -413,12 +357,12 @@ static void generate_font_glyphs(void) {
         };
     }
 }
-
+*/
 
 /* a subsprite renders a rectangle out of a potentially larger texture */
-sprite_t make_sub_sprite(WindowId wid, uint32_t *pixels, int w, int h, 
-                     int src_x, int src_y, int src_w, int src_h,
-                     int dest_x, int dest_y, int dest_w, int dest_h) 
+sprite_t make_sub_sprite(window_state_t *window, uint32_t *pixels, int w, int h, 
+						int src_x, int src_y, int src_w, int src_h,
+						int dest_x, int dest_y, int dest_w, int dest_h) 
 {
     sprite_t s;
     s.pixels = pixels;
@@ -435,8 +379,7 @@ sprite_t make_sub_sprite(WindowId wid, uint32_t *pixels, int w, int h,
         fprintf(stderr, "Creating surface failed: %s", SDL_GetError());
         exit(1);
     }
-	SDL_Renderer *rend = (wid == WIN_DEBUG) ? debug_renderer : renderer;
-    s.texture = SDL_CreateTexture(rend,
+    s.texture = SDL_CreateTexture(window->renderer,
            SDL_PIXELFORMAT_RGB888,
            SDL_TEXTUREACCESS_STREAMING,
            w, h);
@@ -451,29 +394,28 @@ sprite_t make_sub_sprite(WindowId wid, uint32_t *pixels, int w, int h,
     return s;
 }
 
-sprite_t make_sprite(WindowId wid, uint32_t *pixels, int w, int h, 
+sprite_t make_sprite(window_state_t *window, uint32_t *pixels, int w, int h, 
                      int dest_x, int dest_y, int dest_w, int dest_h) 
 {
     return make_sub_sprite(
-        wid, pixels, w, h, 
+        window, pixels, w, h, 
         0, 0, dest_w, dest_h,
         dest_x, dest_y, dest_w, dest_h);
 }
 
-void register_sprite(sprite_t *sprite, WindowId wid) {
-	if (wid == WIN_DEBUG) {
-		assert(debug_sprite_count < MAX_WINDOW_SPRITES);
-		debug_sprites[debug_sprite_count++] = sprite;
-	} else {
-		assert(sprite_count < MAX_WINDOW_SPRITES);
-		sprites[sprite_count++] = sprite;
-	}
+// TODO(shaw): after adding multiple windows and refactoring window things into
+// window_state_t, it seems that "registering" sprites could be done directly
+// in make_sprite. Then it would have to allocate memory for sprites rather than
+// copying on the stack. 
+void register_sprite(window_state_t *window, sprite_t *sprite) {
+	assert(window->sprite_count < MAX_WINDOW_SPRITES);
+	window->sprites[window->sprite_count++] = sprite;
 }
 
-void render_text(WindowId wid, char *text, int x, int y) {
-	if (!debug_renderer) return;
-	SDL_SetRenderDrawColor(debug_renderer, 255, 255, 255, 255);
-	STBTTF_RenderText(debug_renderer, tt_font, (float)x, (float)y, text);
+void render_text(window_state_t *window, char *text, int x, int y) {
+	if (!window->window) return;
+	SDL_SetRenderDrawColor(window->renderer, 255, 255, 255, 255);
+	STBTTF_RenderText(window->renderer, window->font, (float)x, (float)y, text);
 
 	// SDL_Renderer *rend = (wid == WIN_DEBUG) ? debug_renderer : renderer;
     // int i; char *c;
@@ -489,21 +431,14 @@ void render_text(WindowId wid, char *text, int x, int y) {
 
 }
 
-void set_font_color(uint32_t color) {
-    SDL_SetTextureColorMod(font.texture,
-        (color >> 16) & 0xFF,
-        (color >>  8) & 0xFF,
-        (color >>  0) & 0xFF);
-}
-
-void render_text_color(WindowId wid, char *text, int x, int y, uint32_t color) {
-	if (!debug_renderer) return;
+void render_text_color(window_state_t *window, char *text, int x, int y, uint32_t color) {
+	if (!window->window) return;
 	uint8_t r, g, b;
 	r = (color >> 16) & 0xFF;
 	g = (color >> 8)  & 0xFF;
 	b = (color >> 0)  & 0xFF;
-	SDL_SetRenderDrawColor(debug_renderer, r, g, b, 255);
-	STBTTF_RenderText(debug_renderer, tt_font, (float)x, (float)y, text);
+	SDL_SetRenderDrawColor(window->renderer, r, g, b, 255);
+	STBTTF_RenderText(window->renderer, window->font, (float)x, (float)y, text);
 
 	// SDL_Renderer *rend = (wid == WIN_DEBUG) ? debug_renderer : renderer;
     // int i; char *c;
@@ -521,10 +456,6 @@ void render_text_color(WindowId wid, char *text, int x, int y, uint32_t color) {
         // SDL_RenderCopy(rend, font.texture, &font.glyphs[*c-32], &dstrect);
         // SDL_SetTextureColorMod(font.texture, 0xFF, 0xFF, 0xFF);
     // }
-}
-
-SDL_Window *io_get_window(WindowId wid) {
-	return (wid == WIN_DEBUG) ? debug_window : window;
 }
 
 void io_deinit(void) {
