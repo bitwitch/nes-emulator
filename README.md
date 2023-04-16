@@ -8,6 +8,7 @@ trying to figure out audio, even so many years after he wrote them.
 # Linux
 Install [SDL2](https://github.com/libsdl-org/SDL/releases/)  
 Linux installation instructions [here](http://wiki.libsdl.org/Installation#linuxunix)
+**NOTE** You need at least version 2.0.18, because I use SDL_GetTicks64().  
 ## Building
 1. run `make`  
 2. run `./nes <path_to_game_rom>`  
