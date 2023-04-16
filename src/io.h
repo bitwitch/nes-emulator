@@ -12,6 +12,8 @@
 #define WINDOW_HEIGHT (NES_HEIGHT*SCALE)
 #define DEBUG_WINDOW_WIDTH  (NES_WIDTH*SCALE*0.66)
 #define DEBUG_WINDOW_HEIGHT (NES_HEIGHT*SCALE)
+#define MEMORY_WINDOW_WIDTH  800
+#define MEMORY_WINDOW_HEIGHT 600
 
 #define FONT_CHAR_WIDTH 7
 #define FONT_CHAR_HEIGHT 9
@@ -40,7 +42,7 @@ typedef struct {
     bool enter;
     bool space;
     bool escape;
-    bool f,w;
+    bool f,w,m;
     bool nine;
     bool tilde;
 

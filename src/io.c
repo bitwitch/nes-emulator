@@ -14,25 +14,6 @@ void io_init(void) {
         exit(1);
     }
 
-    nes_window.window = SDL_CreateWindow(
-        "NES",
-        SDL_WINDOWPOS_UNDEFINED,
-        SDL_WINDOWPOS_UNDEFINED,
-        (int)WINDOW_WIDTH, (int)WINDOW_HEIGHT,
-        SDL_WINDOW_RESIZABLE);
-    if (!nes_window.window) {
-        fprintf(stderr, "Failed to create window: %s\n", SDL_GetError());
-        exit(1);
-    }
-
-    nes_window.renderer = SDL_CreateRenderer(nes_window.window, -1, 0);
-    if (!nes_window.renderer) {
-        fprintf(stderr, "Failed to create renderer: %s\n", SDL_GetError());
-        exit(1);
-    }
-
-	nes_window.font = STBTTF_OpenFont(nes_window.renderer, "c:/windows/fonts/consola.ttf", 20);
-
     memset(&platform_state, 0, sizeof(platform_state));
     memset(&last_platform_state, 0, sizeof(last_platform_state));
 
@@ -66,30 +47,31 @@ void io_init(void) {
     signal(SIGINT, SIG_DFL);
 }
 
+// NOTE(shaw): io_init must be called before initializing any windows
+void io_init_window(window_state_t *window, char *name, int width, int height) {
+	if (window->window) return; // only allow initialization once
 
-void io_init_debug_window(void) {
-	if (debug_window.window) return;
-
-    debug_window.window = SDL_CreateWindow(
-        "NES Debug",
+    window->window = SDL_CreateWindow(
+		name,
         SDL_WINDOWPOS_UNDEFINED,
         SDL_WINDOWPOS_UNDEFINED,
-        (int)DEBUG_WINDOW_WIDTH, (int)DEBUG_WINDOW_HEIGHT,
+		width, height,
         SDL_WINDOW_RESIZABLE);
-    if (!debug_window.window) {
-        fprintf(stderr, "Failed to create debug window: %s\n", SDL_GetError());
+    if (!window->window) {
+        fprintf(stderr, "Failed to create window '%s': %s\n", name, SDL_GetError());
 		return;
     }
 
-    debug_window.renderer = SDL_CreateRenderer(debug_window.window, -1, 0);
-    if (!debug_window.renderer) {
-        fprintf(stderr, "Failed to create debug renderer: %s\n", SDL_GetError());
+    window->renderer = SDL_CreateRenderer(window->window, -1, 0);
+    if (!window->renderer) {
+        fprintf(stderr, "Failed to create renderer for window '%s': %s\n", name, SDL_GetError());
 		return;
     }
 
 	// Load True Type Font
-	debug_window.font = STBTTF_OpenFont(debug_window.renderer, "c:/windows/fonts/consola.ttf", 20);
+	window->font = STBTTF_OpenFont(window->renderer, "c:/windows/fonts/consola.ttf", 20);
 }
+
 
 /* do_input is the platform level input handler that will keep the current
  * input states up to date in platform_state */
@@ -102,10 +84,8 @@ void do_input() {
                 if (event.window.event == SDL_WINDOWEVENT_CLOSE) {
 					if (event.window.windowID == SDL_GetWindowID(nes_window.window)) {
 						exit(0);
-					} else if (event.window.windowID == SDL_GetWindowID(debug_window.window)) {
-						SDL_HideWindow(debug_window.window);
 					} else {
-						assert(0);
+						SDL_HideWindow(SDL_GetWindowFromID(event.window.windowID));
 					}
                 }
                 break;
@@ -148,6 +128,9 @@ static void do_keyboard_input(SDL_KeyboardEvent *event) {
             break;
         case SDL_SCANCODE_W:
             platform_state.w = event->type == SDL_KEYDOWN;
+            break;
+        case SDL_SCANCODE_M:
+            platform_state.m = event->type == SDL_KEYDOWN;
             break;
         case SDL_SCANCODE_9:
             platform_state.nine = event->type == SDL_KEYDOWN;
@@ -316,6 +299,11 @@ void io_render_prepare(void) {
 		SDL_SetRenderDrawColor(debug_window.renderer, 0x00, 0x00, 0x00, 0xFF);
 		SDL_RenderClear(debug_window.renderer);
 	}
+
+	if (memory_window.window) {
+		SDL_SetRenderDrawColor(memory_window.renderer, 0x00, 0x00, 0x00, 0xFF);
+		SDL_RenderClear(memory_window.renderer);
+	}
 }
 
 void io_render_sprites(void) {
@@ -341,6 +329,8 @@ void io_render_present(void) {
     SDL_RenderPresent(nes_window.renderer);
 	if (debug_window.window)
 		SDL_RenderPresent(debug_window.renderer);
+	if (memory_window.window)
+		SDL_RenderPresent(memory_window.renderer);
 }
 
 /*

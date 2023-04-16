@@ -1,9 +1,9 @@
-#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
 #include <stdbool.h>
+#include <assert.h>
 #include <errno.h>
 #include <math.h>
 #include <signal.h>
@@ -68,6 +68,7 @@ void init_debug_chr_viewer(sprite_t pattern_tables[2], sprite_t palettes[8]);
 void render_cpu_state(cpu_t *cpu, char **cpu_state_lines);
 void render_code(uint16_t pc, char **lines, int num_lines);
 void render_oam_info(void);
+void render_memory(void);
 void emulation_mode_run(cpu_t *cpu);
 void emulation_mode_step_instruction(cpu_t *cpu);
 void emulation_mode_step_frame(cpu_t *cpu);
@@ -81,6 +82,7 @@ int main(int argc, char **argv) {
     cpu_t cpu;
     read_rom_file(argv[1]);
     io_init();
+	io_init_window(&nes_window, "NES", (int)WINDOW_WIDTH, (int)WINDOW_HEIGHT);
 
 
     /* LEAK: 
@@ -122,9 +124,6 @@ int main(int argc, char **argv) {
     last_frame_time = get_ticks();
     emulation_mode_t emulation_mode = EM_RUN;
 
-
-
-
     for (;;) {
         last_platform_state = platform_state;
         do_input();
@@ -133,13 +132,23 @@ int main(int argc, char **argv) {
 		// activate debug window
 		if (platform_state.tilde) {
 			if (!debug_window.window) {
-				io_init_debug_window();
+				io_init_window(&debug_window, "NES Debug", (int)DEBUG_WINDOW_WIDTH, (int)DEBUG_WINDOW_HEIGHT);
 				init_debug_chr_viewer(pattern_tables, palettes);
 				update_pattern_tables(0, pattern_tables);
 				update_palettes(palettes);
 			} else {
 				SDL_ShowWindow(debug_window.window);
 				SDL_RaiseWindow(debug_window.window);
+			}
+		}
+
+		// activate memory window
+		if (platform_state.m) {
+			if (!memory_window.window) {
+				io_init_window(&memory_window, "NES Memory", (int)MEMORY_WINDOW_WIDTH, (int)MEMORY_WINDOW_HEIGHT);
+			} else {
+				SDL_ShowWindow(memory_window.window);
+				SDL_RaiseWindow(memory_window.window);
 			}
 		}
 
@@ -165,23 +174,26 @@ int main(int argc, char **argv) {
 		char *pos = arena_get_pos(&dasm_arena);
 		char **dasm_lines = get_dasm_lines(&dasm_arena, cpu.pc);
 
-
 		// render
 		elapsed_time = get_ticks() - last_frame_time;
 		if (elapsed_time >= MS_PER_FRAME) {
 			if (emulation_mode == EM_STEP_INSTRUCTION || frame_prepared) {
 				io_render_prepare();
+
 				io_render_sprites();
 				render_cpu_state(&cpu, cpu_state_lines);
 				render_code(cpu.pc, dasm_lines, MAX_CODE_LINES);
+				render_memory();
+
 				io_render_present();
+
 				if (emulation_mode == EM_RUN || emulation_mode == EM_STEP_FRAME)
 					frame_prepared = false;
-				last_frame_time += MS_PER_FRAME;
 
 				// NOTE(shaw): since get_ticks is a uint64_t and only has
 				// millisecond precision, the MS_PER_FRAME will be truncated to
 				// 16ms so fps will actually be 62.5 instead of 60
+				last_frame_time += MS_PER_FRAME;
 			}
 		}
 
@@ -375,4 +387,25 @@ void render_code(uint16_t pc, char **lines, int num_lines) {
 			i == current_ins ? 0xFFA7ED : 0xFFFFFF);
 	}
 }
+
+
+#define MAX_LINE_LEN 64
+void render_memory(void) {
+	char buffer[MAX_LINE_LEN];
+	int line_num = 0;
+	int pad = 15;
+	for (uint16_t addr = 0; addr < 16*64; addr += 16) {
+		snprintf(buffer, MAX_LINE_LEN, 
+			"%04X: %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X",
+			addr, bus_read(addr), bus_read(addr+1), bus_read(addr+2), bus_read(addr+3),
+			bus_read(addr+4), bus_read(addr+5), bus_read(addr+6), bus_read(addr+7),
+			bus_read(addr+8), bus_read(addr+9), bus_read(addr+10), bus_read(addr+11),
+			bus_read(addr+12), bus_read(addr+13), bus_read(addr+14), bus_read(addr+15));
+		render_text(&memory_window, buffer, 
+			pad,
+            (int)(line_num*FONT_CHAR_HEIGHT*FONT_SCALE + 2*pad));
+		++line_num;
+	}
+}
+#undef MAX_LINE_LEN
 
