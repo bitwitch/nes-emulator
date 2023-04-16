@@ -11,8 +11,17 @@
 #include <SDL2/SDL_audio.h>
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
-// #define STB_DS_IMPLEMENTATION
-// #include "stb_ds.h"
+
+// testing this out --------------------
+#define STBTTF_IMPLEMENTATION
+#include "stbttf.h"
+#define STB_TRUETYPE_IMPLEMENTATION
+#include "stb_truetype.h"
+#define STB_RECT_PACK_IMPLEMENTATION
+#include "stb_rect_pack.h"
+
+// -------------------------------------
+
 
 #include "cpu_6502.h"
 #include "bus.h"
@@ -112,6 +121,9 @@ int main(int argc, char **argv) {
     elapsed_time = 0;
     last_frame_time = get_ticks();
     emulation_mode_t emulation_mode = EM_RUN;
+
+
+
 
     for (;;) {
         last_platform_state = platform_state;
@@ -313,7 +325,7 @@ char **get_dasm_lines(Arena *arena, uint16_t pc) {
 }
 
 void render_cpu_state(cpu_t *cpu, char **lines) {
-    snprintf(lines[0], MAX_DEBUG_LINE_CHARS+1, "N V _ B D I Z C");
+    snprintf(lines[0], MAX_DEBUG_LINE_CHARS+1, "N V - B D I Z C");
     snprintf(lines[1], MAX_DEBUG_LINE_CHARS+1, "%d %d %d %d %d %d %d %d",  
         (cpu->status >> 7) & 1, (cpu->status >> 6) & 1, (cpu->status >> 5) & 1, 
         (cpu->status >> 4) & 1, (cpu->status >> 3) & 1, (cpu->status >> 2) & 1, 
@@ -330,7 +342,7 @@ void render_cpu_state(cpu_t *cpu, char **lines) {
         if (line == NULL) break;
         render_text(WIN_DEBUG, line, 
         	pad, 
-        	(int)(i*FONT_CHAR_HEIGHT*FONT_SCALE + pad));
+        	(int)(i*FONT_CHAR_HEIGHT*FONT_SCALE + 3*pad));
     }
 }   
 
@@ -360,7 +372,7 @@ void render_code(uint16_t pc, char **lines, int num_lines) {
 	for (int i=0; i<num_lines; ++i) {
 		render_text_color(WIN_DEBUG, lines[i],
 			pad,
-			(int)(i*FONT_CHAR_HEIGHT*FONT_SCALE + 7*FONT_CHAR_HEIGHT*FONT_SCALE + 2*pad),
+			(int)(i*FONT_CHAR_HEIGHT*FONT_SCALE + 7*FONT_CHAR_HEIGHT*FONT_SCALE + 4*pad),
 			i == current_ins ? 0xFFA7ED : 0xFFFFFF);
 	}
 }

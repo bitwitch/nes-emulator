@@ -6,10 +6,13 @@ static struct {
     SDL_Rect glyphs[95];
 } font;
 
+static STBTTF_Font* tt_font;
+
 /*
 typedef struct {
 	SDL_Window *window;
 	SDL_Renderer *renderer;
+	STBTTF_Font* font;
 	sprite_t *sprites[MAX_WINDOW_SPRITES];
 	int sprite_count;
 	bool hidden; 
@@ -114,6 +117,10 @@ void io_init_debug_window(void) {
         fprintf(stderr, "Failed to create debug renderer: %s\n", SDL_GetError());
 		return;
     }
+
+	// Load True Type Font
+	tt_font = STBTTF_OpenFont(debug_renderer, "c:/windows/fonts/consola.ttf", 20);
+
 
     /* Load Bitmap Font */
     uint8_t *font_pixels = stbi_load("font.png", &font.w, &font.h, &font.bytes_per_pixel, STBI_rgb);
@@ -464,17 +471,21 @@ void register_sprite(sprite_t *sprite, WindowId wid) {
 }
 
 void render_text(WindowId wid, char *text, int x, int y) {
-	SDL_Renderer *rend = (wid == WIN_DEBUG) ? debug_renderer : renderer;
-    int i; char *c;
-    for (i=0, c=text; *c != '\0'; ++c, ++i) {
-        assert(*c > 31 && *c < 127);
-        SDL_Rect dstrect = { 
-            x + i*FONT_CHAR_WIDTH*FONT_SCALE, 
-            y, 
-            FONT_CHAR_WIDTH*FONT_SCALE, 
-            FONT_CHAR_HEIGHT*FONT_SCALE };
-        SDL_RenderCopy(rend, font.texture, &font.glyphs[*c-32], &dstrect);
-    }
+	if (!debug_renderer) return;
+	SDL_SetRenderDrawColor(debug_renderer, 255, 255, 255, 255);
+	STBTTF_RenderText(debug_renderer, tt_font, (float)x, (float)y, text);
+
+	// SDL_Renderer *rend = (wid == WIN_DEBUG) ? debug_renderer : renderer;
+    // int i; char *c;
+    // for (i=0, c=text; *c != '\0'; ++c, ++i) {
+        // assert(*c > 31 && *c < 127);
+        // SDL_Rect dstrect = { 
+            // x + i*FONT_CHAR_WIDTH*FONT_SCALE, 
+            // y, 
+            // FONT_CHAR_WIDTH*FONT_SCALE, 
+            // FONT_CHAR_HEIGHT*FONT_SCALE };
+        // SDL_RenderCopy(rend, font.texture, &font.glyphs[*c-32], &dstrect);
+    // }
 
 }
 
@@ -486,22 +497,30 @@ void set_font_color(uint32_t color) {
 }
 
 void render_text_color(WindowId wid, char *text, int x, int y, uint32_t color) {
-	SDL_Renderer *rend = (wid == WIN_DEBUG) ? debug_renderer : renderer;
-    int i; char *c;
-    for (i=0, c=text; *c != '\0'; ++c, ++i) {
-        assert(*c > 31 && *c < 127);
-        SDL_Rect dstrect = { 
-            x + i*FONT_CHAR_WIDTH*FONT_SCALE, 
-            y, 
-            FONT_CHAR_WIDTH*FONT_SCALE, 
-            FONT_CHAR_HEIGHT*FONT_SCALE };
-        SDL_SetTextureColorMod(font.texture, 
-            (color >> 16) & 0xFF,
-            (color >>  8) & 0xFF,
-            (color >>  0) & 0xFF);
-        SDL_RenderCopy(rend, font.texture, &font.glyphs[*c-32], &dstrect);
-        SDL_SetTextureColorMod(font.texture, 0xFF, 0xFF, 0xFF);
-    }
+	if (!debug_renderer) return;
+	uint8_t r, g, b;
+	r = (color >> 16) & 0xFF;
+	g = (color >> 8)  & 0xFF;
+	b = (color >> 0)  & 0xFF;
+	SDL_SetRenderDrawColor(debug_renderer, r, g, b, 255);
+	STBTTF_RenderText(debug_renderer, tt_font, (float)x, (float)y, text);
+
+	// SDL_Renderer *rend = (wid == WIN_DEBUG) ? debug_renderer : renderer;
+    // int i; char *c;
+    // for (i=0, c=text; *c != '\0'; ++c, ++i) {
+        // assert(*c > 31 && *c < 127);
+        // SDL_Rect dstrect = { 
+            // x + i*FONT_CHAR_WIDTH*FONT_SCALE, 
+            // y, 
+            // FONT_CHAR_WIDTH*FONT_SCALE, 
+            // FONT_CHAR_HEIGHT*FONT_SCALE };
+        // SDL_SetTextureColorMod(font.texture, 
+            // (color >> 16) & 0xFF,
+            // (color >>  8) & 0xFF,
+            // (color >>  0) & 0xFF);
+        // SDL_RenderCopy(rend, font.texture, &font.glyphs[*c-32], &dstrect);
+        // SDL_SetTextureColorMod(font.texture, 0xFF, 0xFF, 0xFF);
+    // }
 }
 
 SDL_Window *io_get_window(WindowId wid) {
