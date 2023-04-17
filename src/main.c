@@ -65,10 +65,8 @@ static bool frame_prepared;
 
 char **get_dasm_lines(Arena *arena, uint16_t pc);
 void init_debug_chr_viewer(sprite_t pattern_tables[2], sprite_t palettes[8]);
-void render_cpu_state(cpu_t *cpu, char **cpu_state_lines);
-void render_code(uint16_t pc, char **lines, int num_lines);
-void render_oam_info(void);
-void render_memory(void);
+void render_memory_window(void);
+void render_debug_window(Arena *arena, cpu_t *cpu);
 void emulation_mode_run(cpu_t *cpu);
 void emulation_mode_step_instruction(cpu_t *cpu);
 void emulation_mode_step_frame(cpu_t *cpu);
@@ -116,8 +114,8 @@ int main(int argc, char **argv) {
     logfile = fopen("nestest.log", "w");
 #endif
 
-	Arena dasm_arena = {0};
-	arena_grow(&dasm_arena, ARENA_BLOCK_SIZE); // initialize so that we can call arena_get_pos()
+	Arena frame_arena = {0};
+	arena_grow(&frame_arena, ARENA_BLOCK_SIZE); // initialize so that we can call arena_get_pos()
 	init_cached_ins_addrs(&cpu);
 
     frame_prepared = false;
@@ -126,12 +124,13 @@ int main(int argc, char **argv) {
     emulation_mode_t emulation_mode = EM_RUN;
 
     for (;;) {
+		char *pos = arena_get_pos(&frame_arena);
+
         last_platform_state = platform_state;
         do_input();
-
 	
 		// activate debug window
-		if (platform_state.tilde) {
+		if (platform_state.tilde && !last_platform_state.tilde) {
 			if (!debug_window.window) {
 				io_init_window(&debug_window, "NES Debug", (int)DEBUG_WINDOW_WIDTH, (int)DEBUG_WINDOW_HEIGHT);
 				init_debug_chr_viewer(pattern_tables, palettes);
@@ -143,16 +142,18 @@ int main(int argc, char **argv) {
 			}
 		}
 
+        // transfer states
+		if (!memory_window.goto_tooltip_active) {
+			if (platform_state.enter && !last_platform_state.enter)
+				emulation_mode = EM_RUN;
+			else if (platform_state.space && !last_platform_state.space)
+				emulation_mode = EM_STEP_INSTRUCTION;
+			else if (platform_state.f && !last_platform_state.f)
+				emulation_mode = EM_STEP_FRAME;
+		}
+
 		// activate and update memory window
 		update_memory_window();
-
-        // transfer states
-        if (platform_state.enter && !last_platform_state.enter)
-            emulation_mode = EM_RUN;
-        else if (platform_state.space && !last_platform_state.space)
-            emulation_mode = EM_STEP_INSTRUCTION;
-        else if (platform_state.f && !last_platform_state.f)
-            emulation_mode = EM_STEP_FRAME;
 
 		// emulate
         switch (emulation_mode) {
@@ -164,25 +165,19 @@ int main(int argc, char **argv) {
             break;
         }
 
-		// disassemble
-		char *pos = arena_get_pos(&dasm_arena);
-		char **dasm_lines = get_dasm_lines(&dasm_arena, cpu.pc);
 
 		// render
 		elapsed_time = get_ticks() - last_frame_time;
 		if (elapsed_time >= MS_PER_FRAME) {
+			// FIXME(shaw): if emulation_mode == EM_STEP_FRAME then
+			// render_memory_window() will not get called until the user
+			// presses input to advance the frame
 			if (emulation_mode == EM_STEP_INSTRUCTION || frame_prepared) {
 				io_render_prepare();
-
 				io_render_sprites();
 
-				if (debug_window.window) {
-					render_cpu_state(&cpu, cpu_state_lines);
-					render_code(cpu.pc, dasm_lines, MAX_CODE_LINES);
-				}
-
-				if (memory_window.window)
-					render_memory();
+				render_debug_window(&frame_arena, &cpu);
+				render_memory_window();
 
 				io_render_present();
 
@@ -196,7 +191,7 @@ int main(int argc, char **argv) {
 			}
 		}
 
-		arena_set_pos(&dasm_arena, pos);
+		arena_set_pos(&frame_arena, pos);
     }
 
     /* just let OS clean it up
@@ -387,15 +382,23 @@ void render_code(uint16_t pc, char **lines, int num_lines) {
 	}
 }
 
+void render_debug_window(Arena *arena, cpu_t *cpu) {
+	if (!debug_window.window) return;
+
+	// disassemble
+	char **dasm_lines = get_dasm_lines(arena, cpu->pc);
+
+	render_cpu_state(cpu, cpu_state_lines);
+	render_code(cpu->pc, dasm_lines, MAX_CODE_LINES);
+}
 
 #define MAX_LINE_LEN 74
 void render_memory(void) {
 	char buffer[MAX_LINE_LEN];
 	int line_num = 0;
 	int pad = 15;
-	int line_height = FONT_CHAR_HEIGHT*FONT_SCALE;
-	int num_visible_lines = (memory_window.height / line_height) - 1;
-	uint16_t start = 16 * (uint16_t)(memory_window.scroll_y / line_height);
+	int num_visible_lines = (memory_window.height / TEXT_LINE_HEIGHT) - 1;
+	uint16_t start = 16 * (uint16_t)(memory_window.scroll_y / TEXT_LINE_HEIGHT);
 	start = MIN(start, 0xFFF0 - 16*num_visible_lines);
 	uint16_t end = start + 16*num_visible_lines;
 
@@ -418,40 +421,106 @@ void render_memory(void) {
 			
 		render_text(&memory_window, buffer, 
 			pad,
-            line_num*line_height + line_height);
+            line_num*TEXT_LINE_HEIGHT + TEXT_LINE_HEIGHT);
 		++line_num;
 	}
 }
 #undef MAX_LINE_LEN
 
+void render_memory_window(void) {
+	if (!memory_window.window) return;
+	render_memory();
+	
+	// TODO(shaw): goto address tooltip
+	// if goto address tooltip is open, render it
+		// draw a rectangle towards top of window
+		// draw the input buffer inside the rectangle
+		// ideally draw a cursor as well
+	if (memory_window.goto_tooltip_active) {
+		// draw a rectangle towards top of window
+		int pad = 5;
+		int w = 250;
+		int h = TEXT_LINE_HEIGHT + 4*pad;
+		int x = (int)(0.5*memory_window.width - 0.5*w);
+		int y = 100;
+		SDL_Rect goto_rect = { x, y, w, h };
+		SDL_SetRenderDrawColor(memory_window.renderer, 0x00, 0x00, 0x00, 0xFF);
+		SDL_RenderFillRect(memory_window.renderer, &goto_rect);
+		SDL_SetRenderDrawColor(memory_window.renderer, 0xFF, 0xFF, 0xFF, 0xFF);
+		SDL_RenderDrawRect(memory_window.renderer, &goto_rect);
+
+		// draw the input buffer inside the rectangle
+		int text_x = x + 2*pad;
+		int text_y = y + TEXT_LINE_HEIGHT + (int)(1.5*pad);
+		render_text(&memory_window, "goto addr: ", text_x, text_y);
+		text_x += (int)(strlen("goto addr: ") * FONT_CHAR_WIDTH*FONT_SCALE);
+		render_text(&memory_window, memory_window.goto_input_buf, text_x, text_y);
+	}
+}
+
 #define SCROLL_MULTIPLIER 40
 void update_memory_window(void) {
+	window_state_t *w = &memory_window;
 	// activate memory window
-	if (platform_state.m) {
-		if (!memory_window.window) {
-			io_init_window(&memory_window, "NES Memory", (int)MEMORY_WINDOW_WIDTH, (int)MEMORY_WINDOW_HEIGHT);
+	if (platform_state.m && !last_platform_state.m) {
+		if (!w->window) {
+			io_init_window(w, "NES Memory", (int)MEMORY_WINDOW_WIDTH, (int)MEMORY_WINDOW_HEIGHT);
 
 			// hardcoded amount that results in addr 0xFFF0 displaying at the bottom of the window
 			// this assumes the font Consolas and font size 20
-			memory_window.max_scroll_y = 73080; 
+			w->max_scroll_y = 73080; 
 		} else {
-			SDL_ShowWindow(memory_window.window);
-			SDL_RaiseWindow(memory_window.window);
+			SDL_ShowWindow(w->window);
+			SDL_RaiseWindow(w->window);
 		}
 	}
 
 	// bail if window hasn't been initialized or isn't in focus
-	if (!memory_window.window) return;
-	if (!(SDL_GetWindowFlags(memory_window.window) & SDL_WINDOW_INPUT_FOCUS)) return;
+	if (!w->window) return;
+	if (!(SDL_GetWindowFlags(w->window) & SDL_WINDOW_INPUT_FOCUS)) return;
 
 	// mousewheel scrolling
 	if (platform_state.wheel_y) {
-		memory_window.scroll_y -= platform_state.wheel_y * SCROLL_MULTIPLIER;
-		if (memory_window.scroll_y < 0)
-			memory_window.scroll_y = 0;
-		else if (memory_window.scroll_y > memory_window.max_scroll_y) 
-			memory_window.scroll_y = memory_window.max_scroll_y;
-		printf("%d\n", memory_window.scroll_y);
+		w->scroll_y -= platform_state.wheel_y * SCROLL_MULTIPLIER;
+		if (w->scroll_y < 0)
+			w->scroll_y = 0;
+		else if (w->scroll_y > w->max_scroll_y) 
+			w->scroll_y = w->max_scroll_y;
+		printf("%d\n", w->scroll_y);
 	}
+
+	// GOTO address
+	// pop up a tooltip thing where you can type the address you want to jump to
+	if (platform_state.g && !last_platform_state.g) {
+		w->goto_tooltip_active = !w->goto_tooltip_active;
+	}
+
+	// if goto tooltip is open, record user input into some buffer
+	if (w->goto_tooltip_active) {
+		if (platform_state.hex_char && w->goto_input_index < 4) {
+			w->goto_input_buf[w->goto_input_index++] = platform_state.hex_char;
+		} else if (platform_state.backspace && !last_platform_state.backspace && w->goto_input_index > 0) {
+			w->goto_input_buf[--(w->goto_input_index)] = 0;
+		}
+
+		// if enter is pressed, calculate the scroll offset needed to jump to the desired address and set scroll_y
+		if (platform_state.enter && !last_platform_state.enter) {
+			uint16_t addr = (uint16_t)strtol(w->goto_input_buf, NULL, 16);
+			// align to 16 bytes to get the line the address is on
+			addr &= 0xFFF0;
+			printf("addr = 0x%04X\n", addr);
+
+			int num_lines_above = addr / 16;
+			w->scroll_y = num_lines_above * TEXT_LINE_HEIGHT;
+
+			w->goto_input_index = 0;
+			memset(w->goto_input_buf, 0, 5);
+			w->goto_tooltip_active = false;
+		}
+
+		// ideally highlight the desired address 
+	}
+
+
 }
 #undef SCROLL_MULTIPLIER

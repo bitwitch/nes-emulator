@@ -4,6 +4,46 @@ platform_state_t platform_state;
 platform_state_t last_platform_state;
 uint8_t controller_registers[2];
 
+char scancode_to_char[] = {
+    [SDL_SCANCODE_A] = 'a',
+    [SDL_SCANCODE_B] = 'b',
+    [SDL_SCANCODE_C] = 'c',
+    [SDL_SCANCODE_D] = 'd',
+    [SDL_SCANCODE_E] = 'e',
+    [SDL_SCANCODE_F] = 'f',
+    [SDL_SCANCODE_G] = 'g',
+    [SDL_SCANCODE_H] = 'h',
+    [SDL_SCANCODE_I] = 'i',
+    [SDL_SCANCODE_J] = 'j',
+    [SDL_SCANCODE_K] = 'k',
+    [SDL_SCANCODE_L] = 'l',
+    [SDL_SCANCODE_M] = 'm',
+    [SDL_SCANCODE_N] = 'n',
+    [SDL_SCANCODE_O] = 'o',
+    [SDL_SCANCODE_P] = 'p',
+    [SDL_SCANCODE_Q] = 'q',
+    [SDL_SCANCODE_R] = 'r',
+    [SDL_SCANCODE_S] = 's',
+    [SDL_SCANCODE_T] = 't',
+    [SDL_SCANCODE_U] = 'u',
+    [SDL_SCANCODE_V] = 'v',
+    [SDL_SCANCODE_W] = 'w',
+    [SDL_SCANCODE_X] = 'x',
+    [SDL_SCANCODE_Y] = 'y',
+    [SDL_SCANCODE_Z] = 'z',
+    [SDL_SCANCODE_1] = '1',
+    [SDL_SCANCODE_2] = '2',
+    [SDL_SCANCODE_3] = '3',
+    [SDL_SCANCODE_4] = '4',
+    [SDL_SCANCODE_5] = '5',
+    [SDL_SCANCODE_6] = '6',
+    [SDL_SCANCODE_7] = '7',
+    [SDL_SCANCODE_8] = '8',
+    [SDL_SCANCODE_9] = '9',
+    [SDL_SCANCODE_0] = '0',
+};
+
+
 static void generate_font_glyphs(void);
 static void do_keyboard_input(SDL_KeyboardEvent *event);
 static void do_controller_input(SDL_ControllerButtonEvent *event);
@@ -16,6 +56,9 @@ void io_init(void) {
 
     memset(&platform_state, 0, sizeof(platform_state));
     memset(&last_platform_state, 0, sizeof(last_platform_state));
+
+	// default to no text input
+	SDL_StopTextInput();
 
     /* Controllers */
     int num_controllers = SDL_NumJoysticks();
@@ -76,12 +119,19 @@ void io_init_window(window_state_t *window, char *name, int width, int height) {
 }
 
 
+char text[256];
+char *composition;
+int cursor;
+int selection_len;
+
 /* do_input is the platform level input handler that will keep the current
  * input states up to date in platform_state */
 void do_input() {
     SDL_Event event;
 
-	platform_state.wheel_y = 0; // reset scroll wheel
+	// reset platform_state
+	platform_state.wheel_y = 0; 
+	platform_state.hex_char = 0;
 
     while (SDL_PollEvent(&event)) {
         switch (event.type) {
@@ -113,7 +163,7 @@ void do_input() {
 			case SDL_MOUSEWHEEL:
 				platform_state.wheel_y = event.wheel.y;
 				break;
-             
+
             default:
                 break;
         }
@@ -124,7 +174,18 @@ static void do_keyboard_input(SDL_KeyboardEvent *event) {
     if (event->repeat)
         return;
 
-    switch(event->keysym.scancode) {
+	int scancode = event->keysym.scancode;
+
+	// store hex_char
+	if (event->type == SDL_KEYDOWN && 
+		((scancode >= SDL_SCANCODE_A && scancode <= SDL_SCANCODE_F) ||
+		(scancode >= SDL_SCANCODE_1 && scancode <= SDL_SCANCODE_0)))
+	{
+		platform_state.hex_char = scancode_to_char[scancode];
+	}
+
+
+    switch(scancode) {
         /* emulator buttons */
         case SDL_SCANCODE_RETURN:
             platform_state.enter = event->type == SDL_KEYDOWN;
@@ -132,6 +193,9 @@ static void do_keyboard_input(SDL_KeyboardEvent *event) {
         case SDL_SCANCODE_SPACE:
             platform_state.space = event->type == SDL_KEYDOWN;
             break;
+		case SDL_SCANCODE_BACKSPACE:
+			platform_state.backspace = event->type == SDL_KEYDOWN;
+			break;
         case SDL_SCANCODE_F:
             platform_state.f = event->type == SDL_KEYDOWN;
             break;
@@ -140,6 +204,9 @@ static void do_keyboard_input(SDL_KeyboardEvent *event) {
             break;
         case SDL_SCANCODE_M:
             platform_state.m = event->type == SDL_KEYDOWN;
+            break;
+        case SDL_SCANCODE_G:
+            platform_state.g = event->type == SDL_KEYDOWN;
             break;
         case SDL_SCANCODE_9:
             platform_state.nine = event->type == SDL_KEYDOWN;

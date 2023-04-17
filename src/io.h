@@ -15,9 +15,10 @@
 #define MEMORY_WINDOW_WIDTH  815
 #define MEMORY_WINDOW_HEIGHT WINDOW_HEIGHT
 
-#define FONT_CHAR_WIDTH 7
+#define FONT_CHAR_WIDTH 5.5
 #define FONT_CHAR_HEIGHT 9
 #define FONT_SCALE 2
+#define TEXT_LINE_HEIGHT (FONT_CHAR_HEIGHT*FONT_SCALE)
 
 #define MAX_WINDOW_SPRITES 16
 
@@ -38,16 +39,21 @@ typedef struct {
 	int sprite_count;
 	int scroll_y;
 	int max_scroll_y;
+	bool goto_tooltip_active; // only used for memory window
+	char goto_input_buf[5];   // only used for memory window
+	int goto_input_index;     // only used for memory window
 } window_state_t; 
 
 typedef struct {
     bool enter;
     bool space;
     bool escape;
-    bool f,w,m;
+    bool backspace;
+    bool f,w,m,g;
     bool nine;
     bool tilde;
 	int wheel_y;
+	char hex_char; // a single hex character entered per event loop iteration
 
     uint8_t controller_states[2];
 } platform_state_t;

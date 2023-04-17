@@ -272,8 +272,22 @@ void apu_init(void) {
 }
 
 uint8_t apu_read(uint16_t addr) {
-    if (addr == 0x4015) { /* status register */
-        uint8_t data = 0;
+	uint8_t data = 0;
+
+	// NOTE(shaw): allowing reading addrs besides 0x4015 here for the memory viewer
+	switch(addr) {
+
+	/* triangle */
+	case 0x4008:
+		data = (apu.triangle.linear_control << 7) | apu.triangle.linear_load;
+		break;
+	/* triangle freq_timer low */
+	case 0x400A:
+		data = apu.triangle.freq_timer & 0xFF;
+		break;
+ 
+	/* status register */
+    case 0x4015: { 
         frame_sequencer_t *seq = &apu.frame_sequencer;
 
         if (apu.pulse1.length_counter > 0)
@@ -294,10 +308,11 @@ uint8_t apu_read(uint16_t addr) {
 
         seq->irq_pending = false;
 
-        return data;
+		break;
     }
-
-    return 0;
+	default: break;
+	}
+	return data;
 }
 
 void apu_write(uint16_t addr, uint8_t data) {

@@ -25,16 +25,13 @@ uint8_t bus_read(uint16_t addr) {
         return cpu_ram[addr & 0x7FF];
     else if (addr < 0x4000)
         return ppu_read((addr-0x2000)&0x7);
+	else if (addr < 0x4016)
+		return apu_read(addr);
     else if (addr < 0x4020) {
         switch (addr) {
-            case 0x4015: 
-                return apu_read(addr);
-            case 0x4016: 
-                return controller_read(0);
-            case 0x4017: 
-                return controller_read(1);
-            default: 
-                break;
+			case 0x4016: return controller_read(0);
+			case 0x4017: return controller_read(1);
+			default: break;
         }
     } 
     else 
