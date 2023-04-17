@@ -1,3 +1,4 @@
+char *base_path;
 window_state_t nes_window, debug_window, memory_window;
 SDL_GameController *controllers[2];
 platform_state_t platform_state;
@@ -111,11 +112,15 @@ void io_init_window(window_state_t *window, char *name, int width, int height) {
 		return;
     }
 
-	// Load True Type Font
-	window->font = STBTTF_OpenFont(window->renderer, "c:/windows/fonts/consola.ttf", 20);
-
 	window->width = width;
 	window->height = height;
+
+	// Load True Type Font
+	char font_path[256];
+	if (!base_path) base_path = SDL_GetBasePath();
+	snprintf(font_path, 256, "%s%s", base_path, "inconsolata.ttf");
+	window->font = STBTTF_OpenFont(window->renderer, font_path, 20);
+
 }
 
 
