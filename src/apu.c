@@ -128,7 +128,7 @@ static void tick_dmc_channel(void);
 static void tick_frame_sequencer(void);
 static bool is_sweep_forcing_silence(pulse_channel_t *pulse);
 static uint8_t pulse_output(pulse_channel_t *pulse);
-static uint8_t triangle_output(void);
+static float triangle_output(void);
 static uint8_t noise_output(void);
 
 static apu_t apu;
@@ -277,16 +277,18 @@ uint8_t apu_read(uint16_t addr) {
 	// NOTE(shaw): allowing reading addrs besides 0x4015 here for the memory viewer
 	switch(addr) {
 
-	/* triangle */
+	// triangle $4008-$400B
 	case 0x4008:
 		data = (apu.triangle.linear_control << 7) | apu.triangle.linear_load;
 		break;
-	/* triangle freq_timer low */
 	case 0x400A:
 		data = apu.triangle.freq_timer & 0xFF;
 		break;
- 
-	/* status register */
+	case 0x400B:
+		data = (apu.triangle.length_counter << 3) | ((apu.triangle.freq_timer >> 8) & 0x7);
+		break;
+
+	// status register
     case 0x4015: { 
         frame_sequencer_t *seq = &apu.frame_sequencer;
 
@@ -303,8 +305,16 @@ uint8_t apu_read(uint16_t addr) {
         if (apu.dmc.irq_pending > 0)
             data |= 0x80;
 
-        if (seq->irq_pending)
+		// NOTE(shaw): If an interrupt flag was set at the same moment of the
+		// read, it will read back as 1 but it will not be cleared.
+		// https://www.nesdev.org/wiki/APU#Frame_Counter_($4017)
+		// 
+		// I am not sure what this means, what do they mean "at the same
+		// moment" and why do they just say "an" interrupt flag, suggesting not
+		// just the sequencer irq flag but any interrupt?
+        if (seq->irq_pending) {
             data |= 0x40;
+		} 
 
         seq->irq_pending = false;
 
@@ -404,11 +414,12 @@ void apu_write(uint16_t addr, uint8_t data) {
         case 0x4008:
         {
             apu.triangle.linear_control = (data >> 7) & 1;
-            apu.triangle.enabled = !apu.triangle.linear_control;
             apu.triangle.linear_load = data & 0x7F;
             break;
         }
+
         case 0x4009: break;
+
         case 0x400A:
         /* triangle freq_timer low */
         {
@@ -418,7 +429,7 @@ void apu_write(uint16_t addr, uint8_t data) {
         case 0x400B:
         /* triangle freq_timer high and length counter load*/
         {
-            apu.triangle.freq_timer = (apu.triangle.freq_timer & 0x00FF) | ((data & 0x7) << 8);
+            apu.triangle.freq_timer = (apu.triangle.freq_timer & 0x00FF) | (((uint16_t)data & 0x7) << 8);
             if (apu.triangle.enabled)
                 apu.triangle.length_counter = length_table[(data >> 3) & 0x1F];
             apu.triangle.linear_reload_flag = true;
@@ -476,8 +487,6 @@ void apu_write(uint16_t addr, uint8_t data) {
             break;
         }
 
-
-
         /* status register */
         case 0x4015:
         {
@@ -492,14 +501,10 @@ void apu_write(uint16_t addr, uint8_t data) {
             apu.triangle.enabled = t;
             apu.noise.enabled = n;
 
-            if (!p1)
-                apu.pulse1.length_counter = 0;
-            if (!p2)
-                apu.pulse2.length_counter = 0;
-            if (!t)
-                apu.triangle.length_counter = 0;
-            if (!n)
-                apu.noise.length_counter = 0;
+            if (!p1) apu.pulse1.length_counter   = 0;
+            if (!p2) apu.pulse2.length_counter   = 0;
+            if (!t)  apu.triangle.length_counter = 0;
+            if (!n)  apu.noise.length_counter    = 0;
 
             if (dmc) {
                 if (apu.dmc.sample_length == 0) {
@@ -511,9 +516,9 @@ void apu_write(uint16_t addr, uint8_t data) {
                 apu.dmc.sample_length = 0;
 
             apu.dmc.irq_pending = false; // acknowledge DMC IRQ on write
-                                         //
             break;
         }
+
         case 0x4017:
         /* frame sequencer */
         {
@@ -575,16 +580,14 @@ static void tick_half_frame(void) {
     tick_pulse_sweep(&apu.pulse1, true);
     tick_pulse_sweep(&apu.pulse2, false);
 
-    if (apu.pulse1.enabled && apu.pulse1.length_counter > 0)
+    if (!apu.pulse1.reg.loop && apu.pulse1.length_counter > 0)
         --apu.pulse1.length_counter;
-    if (apu.pulse2.enabled && apu.pulse2.length_counter > 0)
+    if (!apu.pulse2.reg.loop && apu.pulse2.length_counter > 0)
         --apu.pulse2.length_counter;
-    if (apu.triangle.enabled && apu.triangle.length_counter > 0)
+    if (!apu.triangle.linear_control && apu.triangle.length_counter > 0)
         --apu.triangle.length_counter;
-    if (apu.noise.enabled && apu.noise.length_counter > 0)
+    if (!apu.noise.reg.loop && apu.noise.length_counter > 0)
         --apu.noise.length_counter;
-
-    /* TODO(shaw): tick other channel length counters */
 }
 
 static void tick_frame_sequencer(void) {
@@ -711,7 +714,6 @@ static void tick_triangle_channel(void) {
     if (tri->freq_timer < 2 && tri->freq_counter == 0)
         tri->ultrasonic = true;
     
-   
     if (tri->length_counter != 0 &&
         tri->linear_counter != 0 &&
         !tri->ultrasonic)
@@ -725,10 +727,15 @@ static void tick_triangle_channel(void) {
     }
 }
 
-static uint8_t triangle_output(void) {
+static float triangle_output(void) {
     tri_channel_t *tri = &apu.triangle;
-    if (tri->ultrasonic)       return 7; // TODO(shaw): why was this 7.5 before?
-    else if (tri->step & 0x10) return tri->step ^ 0x1F;
+
+	// Due to the averaging effect of the lowpass filter, the resulting value
+	// is halfway between 7 and 8
+	if (tri->ultrasonic)       return 7.5; 
+
+	// output either 15 - 0 or 0 - 15
+    else if (tri->step & 0x10) return (float)(tri->step ^ 0x1F);
     else                       return tri->step;
 }
 
@@ -851,7 +858,7 @@ void apu_tick(void) {
 
     uint8_t pulse1   = 0;
     uint8_t pulse2   = 0;
-    uint8_t triangle = 0;
+    float triangle = 0;
     uint8_t noise    = 0;
     uint8_t dmc      = 0;
 
