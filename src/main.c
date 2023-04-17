@@ -486,7 +486,6 @@ void update_memory_window(void) {
 			w->scroll_y = 0;
 		else if (w->scroll_y > w->max_scroll_y) 
 			w->scroll_y = w->max_scroll_y;
-		printf("%d\n", w->scroll_y);
 	}
 
 	// GOTO address
@@ -508,7 +507,6 @@ void update_memory_window(void) {
 			uint16_t addr = (uint16_t)strtol(w->goto_input_buf, NULL, 16);
 			// align to 16 bytes to get the line the address is on
 			addr &= 0xFFF0;
-			printf("addr = 0x%04X\n", addr);
 
 			int num_lines_above = addr / 16;
 			w->scroll_y = num_lines_above * TEXT_LINE_HEIGHT;
