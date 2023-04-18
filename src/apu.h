@@ -8,5 +8,7 @@ void apu_tick(void);
 void apu_render_sound_wave(void);
 bool apu_request_frame(void);
 void apu_flush_sound_buffer(void);
+bool apu_irq_pending(void);
+void apu_irq_clear(void);
 
 #endif

@@ -851,6 +851,14 @@ void apu_flush_sound_buffer(void) {
     wave_index = 0;
 }
 
+bool apu_irq_pending(void) {
+	return apu.frame_sequencer.irq_pending;
+}
+
+void apu_irq_clear(void) {
+	apu.frame_sequencer.irq_pending = false;
+}
+
 void apu_tick(void) {
     static int downsample_counter = -1;
     static bool downsample_even = 0;

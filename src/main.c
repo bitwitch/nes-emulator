@@ -66,6 +66,7 @@ char **get_dasm_lines(Arena *arena, uint16_t pc);
 void init_debug_chr_viewer(sprite_t pattern_tables[2], sprite_t palettes[8]);
 void render_memory_window(void);
 void render_debug_window(Arena *arena, cpu_t *cpu);
+void do_interrupts(cpu_t *cpu);
 void emulation_mode_run(cpu_t *cpu);
 void emulation_mode_step_instruction(cpu_t *cpu);
 void emulation_mode_step_frame(cpu_t *cpu);
@@ -205,18 +206,26 @@ int main(int argc, char **argv) {
     return 0;
 }
 
+void do_interrupts(cpu_t *cpu) {
+	if (cpu->op_cycles == 0 && ppu_nmi())  {
+		cpu_nmi(cpu);
+		ppu_clear_nmi();
+	}
+	if (cpu->op_cycles == 0 && cart_irq_pending()) {
+		cpu_irq(cpu);
+		cart_irq_clear();
+	}
+	if (cpu->op_cycles == 0 && apu_irq_pending()) {
+		cpu_irq(cpu);
+		apu_irq_clear();
+	}
+}
+
 void emulation_mode_run(cpu_t *cpu) {
 	/* update */
 	if (apu_request_frame()) {
 		while (!ppu_frame_completed()) {
-			if (cpu->op_cycles == 0 && ppu_nmi())  {
-				cpu_nmi(cpu);
-				ppu_clear_nmi();
-			}
-			if (cpu->op_cycles == 0 && cart_irq_pending()) {
-				cpu_irq(cpu);
-				cart_irq_clear();
-			}
+			do_interrupts(cpu);
 			cpu_tick(cpu);
 			apu_tick();
 			ppu_tick(); ppu_tick(); ppu_tick();
@@ -236,14 +245,7 @@ void emulation_mode_run(cpu_t *cpu) {
 void emulation_mode_step_instruction(cpu_t *cpu) {
 	/* update */
 	if (platform_state.space && !last_platform_state.space) {
-		if (cpu->op_cycles == 0 && ppu_nmi()) {
-			cpu_nmi(cpu);
-			ppu_clear_nmi();
-		}
-		if (cpu->op_cycles == 0 && cart_irq_pending()) {
-			cpu_irq(cpu);
-			cart_irq_clear();
-		}
+		do_interrupts(cpu);
 
 		do {
 			cpu_tick(cpu);
@@ -267,14 +269,7 @@ void emulation_mode_step_frame(cpu_t *cpu) {
 	/* update */
 	if (!frame_prepared && platform_state.f && !last_platform_state.f) {
 		while (!ppu_frame_completed()) {
-			if (cpu->op_cycles == 0 && ppu_nmi()) {
-				cpu_nmi(cpu);
-				ppu_clear_nmi();
-			}
-			if (cpu->op_cycles == 0 && cart_irq_pending()) {
-				cpu_irq(cpu);
-				cart_irq_clear();
-			}
+			do_interrupts(cpu);
 			cpu_tick(cpu);
 			apu_tick();
 			ppu_tick(); ppu_tick(); ppu_tick();
@@ -530,7 +525,5 @@ void update_memory_window(void) {
 
 		// ideally highlight the desired address 
 	}
-
-
 }
 #undef SCROLL_MULTIPLIER
