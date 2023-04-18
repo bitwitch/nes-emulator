@@ -35,6 +35,8 @@ void cpu_irq(cpu_t *cpu) {
 
     /* set interrupt disable */
     set_flag(cpu, STATUS_I, 1);
+
+    cpu->op_cycles = 7;
 }
 
 void cpu_nmi(cpu_t *cpu) {
@@ -1167,7 +1169,7 @@ void debug_log_instruction(cpu_t *cpu) {
         snprintf(decoded, 27, "$%.2X,Y @ %.2X = %.2X", operand, addr, bus_read(addr));
     }
 
-    fprintf(logfile, "%.4X  %.2X %-5s  %3s %-26s  A:%.2X X:%.2X Y:%.2X P:%.2X SP:%.2X PPU:%3d,%3d CYC:%ld\n", cpu->pc-1, cpu->opcode, operands, op.name, decoded, cpu->a, cpu->x, cpu->y, cpu->status, cpu->sp, ppu_get_scanline(), ppu_get_cycle(), cpu->cycles);
+    fprintf(logfile, "%.4X  %.2X %-5s  %3s %-26s  A:%.2X X:%.2X Y:%.2X P:%.2X SP:%.2X PPU:%3d,%3d CYC:%lld\n", cpu->pc-1, cpu->opcode, operands, op.name, decoded, cpu->a, cpu->x, cpu->y, cpu->status, cpu->sp, ppu_get_scanline(), ppu_get_cycle(), cpu->cycles);
 }
 #endif
 

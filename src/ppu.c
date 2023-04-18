@@ -555,10 +555,6 @@ void rendering_tick(void) {
 
         ppu_evaluate_sprites();
 
-    } else if (ppu.cycle == 260) {
-		// NOTE(shaw): this allows mappers to keep track of ppu scanlines
-		if (ppu.scanline < 241) cart_scanline();
-
     } else if (ppu.cycle == 337 || ppu.cycle == 339) {
         /* unused nametable fetch */
         loopy_t *v = &ppu.vram_addr;
@@ -680,6 +676,11 @@ void ppu_tick(void) {
             return;
         }
     }
+
+	if ((MASK_SHOW_SPR || MASK_SHOW_BG) && (ppu.scanline < 241 && ppu.cycle == 260)) {
+		// NOTE(shaw): this allows mappers to keep track of ppu scanlines
+		cart_scanline();
+	}
 
     if (++ppu.cycle > 340) {
         ppu.cycle = 0;

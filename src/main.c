@@ -241,8 +241,8 @@ void emulation_mode_step_instruction(cpu_t *cpu) {
 			ppu_clear_nmi();
 		}
 		if (cpu->op_cycles == 0 && cart_irq_pending()) {
-			cart_irq_clear();
 			cpu_irq(cpu);
+			cart_irq_clear();
 		}
 
 		do {
@@ -272,8 +272,8 @@ void emulation_mode_step_frame(cpu_t *cpu) {
 				ppu_clear_nmi();
 			}
 			if (cpu->op_cycles == 0 && cart_irq_pending()) {
-				cart_irq_clear();
 				cpu_irq(cpu);
+				cart_irq_clear();
 			}
 			cpu_tick(cpu);
 			apu_tick();

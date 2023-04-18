@@ -468,8 +468,8 @@ mapper4_write(mapper_t *head, uint16_t addr, uint8_t data) {
 
 			if (mapper->prg_bank_mode) {
 				mapper->prg_bank[0] = second_last * _8KB;
-				mapper->prg_bank[1] = (mapper->bank_regs[7] & 0x3f) * _8KB;
-				mapper->prg_bank[2] = (mapper->bank_regs[6] & 0x3f) * _8KB;
+				mapper->prg_bank[1] = (mapper->bank_regs[7] & 0x3F) * _8KB;
+				mapper->prg_bank[2] = (mapper->bank_regs[6] & 0x3F) * _8KB;
 				mapper->prg_bank[3] = last * _8KB;
 			} else {
 				mapper->prg_bank[0] = (mapper->bank_regs[6] & 0x3F) * _8KB;
@@ -502,14 +502,13 @@ mapper4_write(mapper_t *head, uint16_t addr, uint8_t data) {
 	} else if (addr < 0xE000) { // $C000-$DFFF
 		if (addr & 1) { // odd
 			mapper->irq_counter = 0;
-			// mapper->irq_reload_flag = true;
 		} else {       // even
 			mapper->irq_load = data;
 		}
 	} else { // $E000-$FFFF
 		if (addr & 1) { // odd
 			mapper->irq_enabled = true;
-		} else {
+		} else {        // even
 			mapper->irq_enabled = false;
 			mapper->irq_pending = false;
 		}
