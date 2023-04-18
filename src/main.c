@@ -25,7 +25,6 @@
 
 #include "cpu_6502.h"
 #include "bus.h"
-#include "mappers.h"
 #include "cart.h"
 #include "io.h"
 #include "ppu.h"
@@ -121,7 +120,7 @@ int main(int argc, char **argv) {
     frame_prepared = false;
     elapsed_time = 0;
     last_frame_time = get_ticks();
-    emulation_mode_t emulation_mode = EM_RUN;
+	emulation_mode_t emulation_mode = EM_RUN;
 
     for (;;) {
 		char *pos = arena_get_pos(&frame_arena);
@@ -214,6 +213,10 @@ void emulation_mode_run(cpu_t *cpu) {
 				cpu_nmi(cpu);
 				ppu_clear_nmi();
 			}
+			if (cpu->op_cycles == 0 && cart_irq_pending()) {
+				cpu_irq(cpu);
+				cart_irq_clear();
+			}
 			cpu_tick(cpu);
 			apu_tick();
 			ppu_tick(); ppu_tick(); ppu_tick();
@@ -237,6 +240,11 @@ void emulation_mode_step_instruction(cpu_t *cpu) {
 			cpu_nmi(cpu);
 			ppu_clear_nmi();
 		}
+		if (cpu->op_cycles == 0 && cart_irq_pending()) {
+			cart_irq_clear();
+			cpu_irq(cpu);
+		}
+
 		do {
 			cpu_tick(cpu);
 			apu_tick();
@@ -262,6 +270,10 @@ void emulation_mode_step_frame(cpu_t *cpu) {
 			if (cpu->op_cycles == 0 && ppu_nmi()) {
 				cpu_nmi(cpu);
 				ppu_clear_nmi();
+			}
+			if (cpu->op_cycles == 0 && cart_irq_pending()) {
+				cart_irq_clear();
+				cpu_irq(cpu);
 			}
 			cpu_tick(cpu);
 			apu_tick();

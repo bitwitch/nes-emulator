@@ -695,9 +695,9 @@ uint8_t op_tya(cpu_t *cpu, uint16_t addr) {
  * Illegal Opcodes 
  */ 
 uint8_t op_kil(cpu_t *cpu, uint16_t addr) {
-    (void)cpu; 
-    (void)addr;
-    assert(0 && "kil instruction halted cpu");
+	(void)cpu; 
+	(void)addr;
+	assert(0 && "kil instruction halted cpu");
     return 0;
 }
 

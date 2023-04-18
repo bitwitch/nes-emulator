@@ -179,13 +179,6 @@ void cart_cpu_write(uint16_t addr, uint8_t data) {
 		assert(mapped_addr < PRG_RAM_SIZE);
         cart.prg_ram[mapped_addr] = data;
 	}
-
-    /*if (addr < 0x2000) */
-        /*cart.chr_rom[addr] = data;*/
-    /*else if (addr < 0x6000)*/
-        /*assert(0 && "this part of cart memory not implemented");*/
-    /*else if (addr < 0x8000)*/
-        /*cart.prg_ram[addr - 0x6000] = data;*/
 }
 
 
@@ -206,5 +199,14 @@ void cart_ppu_write(uint16_t addr, uint8_t data, uint8_t vram[2048]) {
         vram[mapped_addr] = data;
 }
 
+void cart_scanline(void) {
+	mapper_scanline(cart.mapper);
+}
 
+bool cart_irq_pending(void) {
+	return mapper_irq_pending(cart.mapper);
+}
 
+void cart_irq_clear(void) {
+	mapper_irq_clear(cart.mapper);
+}

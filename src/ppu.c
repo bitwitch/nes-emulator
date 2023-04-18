@@ -555,6 +555,10 @@ void rendering_tick(void) {
 
         ppu_evaluate_sprites();
 
+    } else if (ppu.cycle == 260) {
+		// NOTE(shaw): this allows mappers to keep track of ppu scanlines
+		if (ppu.scanline < 241) cart_scanline();
+
     } else if (ppu.cycle == 337 || ppu.cycle == 339) {
         /* unused nametable fetch */
         loopy_t *v = &ppu.vram_addr;

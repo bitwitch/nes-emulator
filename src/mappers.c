@@ -13,6 +13,25 @@
  *
  */
 
+#define _KB       1024
+#define _4KB      4096
+#define _8KB      8192
+#define _16KB     16384
+#define _32KB     32768
+
+typedef enum {
+	MIRROR_HORIZONTAL,
+	MIRROR_VERTICAL,
+} MirrorMode;
+
+typedef struct {
+    uint8_t prg_banks;    /* number of 16KB prg rom banks */
+    uint8_t chr_banks;    /* number of  8KB chr rom banks */
+    MirrorMode mirroring; /* 0 == horizontal 1 == vertical */
+    uint16_t id;          /* mapper number */
+} mapper_t;
+
+
 /***************************************************************************** 
  * MAPPER 0 
  ****************************************************************************/
@@ -327,6 +346,202 @@ mapper3_write(mapper_t *head, uint16_t addr, uint8_t data) {
 
 
 /***************************************************************************** 
+ * MAPPER 4
+ ****************************************************************************/
+/*
+ *  CPU $6000-$7FFF: 8 KB PRG RAM bank (optional)
+ *  CPU $8000-$9FFF (or $C000-$DFFF): 8 KB switchable PRG ROM bank
+ *  CPU $A000-$BFFF: 8 KB switchable PRG ROM bank
+ *  CPU $C000-$DFFF (or $8000-$9FFF): 8 KB PRG ROM bank, fixed to the second-last bank
+ *  CPU $E000-$FFFF: 8 KB PRG ROM bank, fixed to the last bank
+ *  PPU $0000-$07FF (or $1000-$17FF): 2 KB switchable CHR bank
+ *  PPU $0800-$0FFF (or $1800-$1FFF): 2 KB switchable CHR bank
+ *  PPU $1000-$13FF (or $0000-$03FF): 1 KB switchable CHR bank
+ *  PPU $1400-$17FF (or $0400-$07FF): 1 KB switchable CHR bank
+ *  PPU $1800-$1BFF (or $0800-$0BFF): 1 KB switchable CHR bank
+ *  PPU $1C00-$1FFF (or $0C00-$0FFF): 1 KB switchable CHR bank
+ */
+typedef struct {
+    mapper_t head;
+    uint8_t bank_select; 
+	uint8_t bank_regs[8];
+	uint32_t prg_bank[4];
+	uint32_t chr_bank[8];
+	uint8_t prg_bank_mode;
+	uint8_t chr_inversion;
+	uint8_t irq_counter;
+	uint8_t irq_load;
+	bool irq_reload_flag;
+	bool irq_enabled;
+	bool irq_pending;
+	bool write_protect;
+	bool prg_ram_enable;
+} mapper4_t;
+
+static uint32_t
+mapper4_map_addr(mapper_t *head, uint16_t addr) {
+    mapper4_t *mapper = (mapper4_t *)head;
+
+	// CHR Banks
+	if (addr < 0x0400)                               // $0000-$03FF
+		return mapper->chr_bank[0] + (addr & 0x03FF);
+	else if (addr < 0x0800)                          // $0400-$07FF
+		return mapper->chr_bank[1] + (addr & 0x03FF);
+	else if (addr < 0x0C00)                          // $0800-$0BFF
+		return mapper->chr_bank[2] + (addr & 0x03FF);
+	else if (addr < 0x1000)                          // $0C00-$0FFF
+		return mapper->chr_bank[3] + (addr & 0x03FF);
+	else if (addr < 0x1400)                          // $1000-$13FF
+		return mapper->chr_bank[4] + (addr & 0x03FF);
+	else if (addr < 0x1800)                          // $1400-$17FF
+		return mapper->chr_bank[5] + (addr & 0x03FF);
+	else if (addr < 0x1C00)                          // $1800-$1BFF
+		return mapper->chr_bank[6] + (addr & 0x03FF);
+	else if (addr < 0x2000)                          // $1C00-$1FFF
+		return mapper->chr_bank[7] + (addr & 0x03FF);
+
+    /* horizontal and vertical nametable mirroring */
+	else if (addr < 0x3F00) {
+        uint32_t mapped_addr = (addr & 0x2FFF) - 0x2000;
+        if (head->mirroring == MIRROR_VERTICAL)
+            return mapped_addr & 0x07FF;
+        else
+            return mapped_addr < 0x0800
+                ? mapped_addr & 0x03FF
+                : ((mapped_addr-0x0800) & 0x03FF) + 0x0400;
+    } 
+
+    else if (addr < 0x6000) 
+        return addr;
+    else if (addr < 0x8000) // $6000-$7FFF 
+        return addr - 0x6000;
+
+	// PRG Banks
+    else if (addr < 0xA000)                          // $8000-$9FFF
+		return mapper->prg_bank[0] + (addr & 0x1FFF);
+    else if (addr < 0xC000)                          // $A000-$BFFF
+		return mapper->prg_bank[1] + (addr & 0x1FFF);
+    else if (addr < 0xE000)                          // $C000-$DFFF
+		return mapper->prg_bank[2] + (addr & 0x1FFF);
+    else                                             // $E000-$FFFF
+		return mapper->prg_bank[3] + (addr & 0x1FFF);
+}
+
+static uint32_t 
+mapper4_read(mapper_t *head, uint16_t addr) {
+    return mapper4_map_addr(head, addr);
+}
+
+static uint32_t 
+mapper4_write(mapper_t *head, uint16_t addr, uint8_t data) {
+	mapper4_t *mapper = (mapper4_t *)head;
+
+	if (addr < 0x8000) {
+		// do nothing
+	} else if (addr < 0xA000) { // $8000-$9FFF
+		if (addr & 1) { // odd
+			mapper->bank_regs[mapper->bank_select] = data;
+
+			if (mapper->chr_inversion) {
+				mapper->chr_bank[0] = mapper->bank_regs[2] * _KB;
+				mapper->chr_bank[1] = mapper->bank_regs[3] * _KB;
+				mapper->chr_bank[2] = mapper->bank_regs[4] * _KB;
+				mapper->chr_bank[3] = mapper->bank_regs[5] * _KB;
+				mapper->chr_bank[4] = (mapper->bank_regs[0] & 0xFE) * _KB;
+				mapper->chr_bank[5] = (mapper->bank_regs[0] + 1)    * _KB;
+				mapper->chr_bank[6] = (mapper->bank_regs[1] & 0xFE) * _KB;
+				mapper->chr_bank[7] = (mapper->bank_regs[1] + 1)    * _KB;
+			} else {
+				mapper->chr_bank[0] = (mapper->bank_regs[0] & 0xFE) * _KB;
+				mapper->chr_bank[1] = (mapper->bank_regs[0] + 1)    * _KB;
+				mapper->chr_bank[2] = (mapper->bank_regs[1] & 0xFE) * _KB;
+				mapper->chr_bank[3] = (mapper->bank_regs[1] + 1)    * _KB;
+				mapper->chr_bank[4] = mapper->bank_regs[2] * _KB;
+				mapper->chr_bank[5] = mapper->bank_regs[3] * _KB;
+				mapper->chr_bank[6] = mapper->bank_regs[4] * _KB;
+				mapper->chr_bank[7] = mapper->bank_regs[5] * _KB;
+			}
+
+			// last and second last prg banks (in 8KB chunks)
+			uint8_t last = head->prg_banks*2 - 1;
+			uint8_t second_last = last - 1;
+
+			if (mapper->prg_bank_mode) {
+				mapper->prg_bank[0] = second_last * _8KB;
+				mapper->prg_bank[1] = (mapper->bank_regs[7] & 0x3f) * _8KB;
+				mapper->prg_bank[2] = (mapper->bank_regs[6] & 0x3f) * _8KB;
+				mapper->prg_bank[3] = last * _8KB;
+			} else {
+				mapper->prg_bank[0] = (mapper->bank_regs[6] & 0x3F) * _8KB;
+				mapper->prg_bank[1] = (mapper->bank_regs[7] & 0x3F) * _8KB;
+				mapper->prg_bank[2] = second_last * _8KB;
+				mapper->prg_bank[3] = last * _8KB;
+			}
+		} else { // even
+			mapper->bank_select = data & 0x7;
+			mapper->prg_bank_mode = (data >> 6) & 1;
+			mapper->chr_inversion = (data >> 7) & 1;
+		}
+
+	} else if (addr < 0xC000) { // $A000-$BFFF
+		if (addr & 1) { // odd
+			mapper->write_protect  = (data >> 6) & 1;
+			mapper->prg_ram_enable = (data >> 7) & 1;
+			// NOTE: Though these bits are functional on the MMC3, their main
+			// purpose is to write-protect save RAM during power-off. Many
+			// emulators choose not to implement them as part of iNES Mapper 4
+			// to avoid an incompatibility with the MMC6.
+
+		} else { //even
+			head->mirroring = (data & 1) ? MIRROR_HORIZONTAL : MIRROR_VERTICAL;
+			// NOTE: This bit has no effect on cartridges with hardwired
+			// 4-screen VRAM. In the iNES and NES 2.0 formats, this can be
+			// identified through bit 3 of byte $06 of the header.
+		}
+
+	} else if (addr < 0xE000) { // $C000-$DFFF
+		if (addr & 1) { // odd
+			mapper->irq_counter = 0;
+			// mapper->irq_reload_flag = true;
+		} else {       // even
+			mapper->irq_load = data;
+		}
+	} else { // $E000-$FFFF
+		if (addr & 1) { // odd
+			mapper->irq_enabled = true;
+		} else {
+			mapper->irq_enabled = false;
+			mapper->irq_pending = false;
+		}
+	}
+
+    return mapper4_map_addr(head, addr);
+}
+
+void mapper4_scanline(mapper_t *head) {
+    mapper4_t *mapper = (mapper4_t *)head;
+	if (mapper->irq_counter > 0)
+		--mapper->irq_counter;
+	else {
+		mapper->irq_counter = mapper->irq_load;
+		if (mapper->irq_enabled) { 
+			mapper->irq_pending = true;
+		}
+	}
+}
+
+
+bool mapper4_irq_pending(mapper_t *head) {
+    mapper4_t *mapper = (mapper4_t *)head;
+	return mapper->irq_pending;
+}
+
+void mapper4_irq_clear(mapper_t *head) {
+    mapper4_t *mapper = (mapper4_t *)head;
+	mapper->irq_pending = false;
+}
+
+/***************************************************************************** 
  * MAPPER 7 
  * 
  * NOTE(shaw): there are a few games that use this mapper that are among the 
@@ -413,32 +628,40 @@ mapper_t *make_mapper(uint16_t mapper_id, uint8_t prg_banks, uint8_t chr_banks, 
     mapper_t *mapper;
 
     switch(mapper_id) {
-        case 0:
-        {
+        case 0: {
             mapper0_t *mapper0 = calloc(1, sizeof(mapper0_t));
             mapper = (mapper_t *)mapper0;
             break;
         }
-        case 1:
-        {
+        case 1: {
             mapper1_t *mapper1 = calloc(1, sizeof(mapper1_t));
             mapper = (mapper_t *)mapper1;
             break;
         }
-        case 2:
-        {
+        case 2: {
             mapper2_t *mapper2 = calloc(1, sizeof(mapper2_t));
             mapper = (mapper_t *)mapper2;
             break;
         }
-        case 3:
-        {
+        case 3: {
             mapper3_t *mapper3 = calloc(1, sizeof(mapper3_t));
             mapper = (mapper_t *)mapper3;
             break;
         }
-        case 7:
-        {
+        case 4: {
+            mapper4_t *mapper4 = calloc(1, sizeof(mapper4_t));
+
+			uint8_t last = prg_banks*2 - 1;
+			uint8_t second_last = last - 1;
+
+			mapper4->prg_bank[0] = 0;
+			mapper4->prg_bank[1] = _8KB;
+			mapper4->prg_bank[2] = second_last * _8KB;
+			mapper4->prg_bank[3] = last * _8KB;
+            mapper = (mapper_t *)mapper4;
+            break;
+		}
+        case 7: {
             mapper7_t *mapper7 = calloc(1, sizeof(mapper7_t));
             mapper = (mapper_t *)mapper7;
             break;
@@ -464,6 +687,7 @@ uint32_t mapper_read(mapper_t *mapper, uint16_t addr) {
         case 1: return mapper1_read(mapper, addr);
         case 2: return mapper2_read(mapper, addr);
         case 3: return mapper3_read(mapper, addr);
+        case 4: return mapper4_read(mapper, addr);
         case 7: return mapper7_read(mapper, addr);
         default:
             fprintf(stderr, "Unsupported mapper %d\n", mapper->id);
@@ -478,6 +702,7 @@ uint32_t mapper_write(mapper_t *mapper, uint16_t addr, uint8_t data) {
         case 1: return mapper1_write(mapper, addr, data);
         case 2: return mapper2_write(mapper, addr, data);
         case 3: return mapper3_write(mapper, addr, data);
+        case 4: return mapper4_write(mapper, addr, data);
         case 7: return mapper7_write(mapper, addr, data);
         default:
             fprintf(stderr, "Unsupported mapper %d\n", mapper->id);
@@ -486,4 +711,24 @@ uint32_t mapper_write(mapper_t *mapper, uint16_t addr, uint8_t data) {
     }
 }
 
+void mapper_scanline(mapper_t *mapper) {
+    switch (mapper->id) {
+        case 4: mapper4_scanline(mapper);
+		default: break;
+	}
+}
+
+bool mapper_irq_pending(mapper_t *mapper) {
+    switch (mapper->id) {
+        case 4:  return mapper4_irq_pending(mapper);
+		default: return false;
+	}
+}
+
+void mapper_irq_clear(mapper_t *mapper) {
+    switch (mapper->id) {
+        case 4:  mapper4_irq_clear(mapper);
+		default: break;
+	}
+}
 
