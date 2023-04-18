@@ -521,12 +521,19 @@ void mapper4_scanline(mapper_t *head) {
     mapper4_t *mapper = (mapper4_t *)head;
 	if (mapper->irq_counter > 0)
 		--mapper->irq_counter;
-	else {
+	else 
 		mapper->irq_counter = mapper->irq_load;
-		if (mapper->irq_enabled) { 
-			mapper->irq_pending = true;
-		}
-	}
+
+	// NOTE(shaw): this check must happen AFTER decrementing/reloading
+	//
+	// FUCKING THANK YOU BLARGG!! for pointing this out in your mmc3 test roms
+	// see readme.txt: http://slack.net/~ant/old/nes-tests/mmc3_test_2.zip
+	//
+	// TODO(shaw): blargg also says: "The IRQ flag is not set when the counter is cleared by writing to $C001"
+	// so i need to look into that, currently there is no differentiation
+	// between counter reaching zero by clocking and by a write to $C001
+	if (mapper->irq_counter == 0 && mapper->irq_enabled)
+		mapper->irq_pending = true;
 }
 
 

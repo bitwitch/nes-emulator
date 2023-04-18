@@ -427,6 +427,11 @@ void ppu_write(uint16_t addr, uint8_t data) {
                 ppu.vram_addr.reg = ppu.vram_temp.reg;
             } else {
                 ppu.vram_temp.reg = (ppu.vram_temp.reg & 0x00FF) | ((uint16_t)(data & 0x3F) << 8);
+
+				// mapper scanline counter can be clocked manually via bit 12 of
+				// the VRAM address even when $2000 = $00 (bg and sprites both
+				// use tiles from $0xxx).
+				if (data & 0x08) cart_scanline();
             }
 
             ppu.offset_toggle = !ppu.offset_toggle;
