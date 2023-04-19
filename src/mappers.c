@@ -371,9 +371,13 @@ typedef struct {
 	uint8_t chr_inversion;
 	uint8_t irq_counter;
 	uint8_t irq_load;
-	bool irq_reload_flag;
 	bool irq_enabled;
 	bool irq_pending;
+
+	// NOTE: Though these bits are functional on the MMC3, their main purpose
+	// is to write-protect save RAM during power-off. Many emulators choose not
+	// to implement them as part of iNES Mapper 4 to avoid an incompatibility
+	// with the MMC6.
 	bool write_protect;
 	bool prg_ram_enable;
 } mapper4_t;
@@ -402,7 +406,7 @@ mapper4_map_addr(mapper_t *head, uint16_t addr) {
 
     /* horizontal and vertical nametable mirroring */
 	else if (addr < 0x3F00) {
-        uint32_t mapped_addr = (addr & 0x2FFF) - 0x2000;
+        uint32_t mapped_addr = addr & 0x0FFF;
         if (head->mirroring == MIRROR_VERTICAL)
             return mapped_addr & 0x07FF;
         else
@@ -414,7 +418,7 @@ mapper4_map_addr(mapper_t *head, uint16_t addr) {
     else if (addr < 0x6000) 
         return addr;
     else if (addr < 0x8000) // $6000-$7FFF 
-        return addr - 0x6000;
+        return addr & 0x1FFF;
 
 	// PRG Banks
     else if (addr < 0xA000)                          // $8000-$9FFF

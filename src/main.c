@@ -7,20 +7,17 @@
 #include <errno.h>
 #include <math.h>
 #include <signal.h>
+
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_audio.h>
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
-
-// testing this out --------------------
 #define STBTTF_IMPLEMENTATION
 #include "stbttf.h"
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "stb_truetype.h"
 #define STB_RECT_PACK_IMPLEMENTATION
 #include "stb_rect_pack.h"
-
-// -------------------------------------
 
 
 #include "cpu_6502.h"
