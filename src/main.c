@@ -108,7 +108,7 @@ int main(int argc, char **argv) {
 
     ppu_init(nes_quad.pixels);
 
-    cpu_reset(&cpu);
+	system_reset(&cpu);
 
 #ifdef DEBUG_LOG
     logfile = fopen("nestest.log", "w");
@@ -129,6 +129,10 @@ int main(int argc, char **argv) {
         last_platform_state = platform_state;
         do_input();
 	
+		// reset
+		if (platform_state.r && !last_platform_state.r)
+			system_reset(&cpu);
+
 		// activate debug window
 		if (platform_state.tilde && !last_platform_state.tilde) {
 			if (!debug_window.window) {

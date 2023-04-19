@@ -59,7 +59,7 @@ typedef struct {
 
     uint32_t colors[64];
     uint32_t *screen_pixels;
-    bool even_odd_toggle;
+    bool odd;
     bool frame_completed;
     bool nmi_occured;
     uint16_t cycle, scanline;
@@ -88,10 +88,9 @@ enum {
 };
 
 
-static ppu_t ppu = { 
-    /* palette generated from http://drag.wootest.net/misc/palgen.html
-     * this format is ARGB */
-    .colors = { 0x464646, 0x000154, 0x000070, 0x07006b, 0x280048, 0x3c000e, 0x3e0000, 0x2c0000, 0x0d0300, 0x001500, 0x001f00, 0x001f00, 0x001420, 0x000000, 0x000000, 0x000000, 0x9d9d9d, 0x0041b0, 0x1825d5, 0x4a0dcf, 0x75009f, 0x900153, 0x920f00, 0x7b2800, 0x514400, 0x205c00, 0x006900, 0x006916, 0x005a6a, 0x000000, 0x000000, 0x000000, 0xfeffff, 0x4896ff, 0x626dff, 0x8e5bff, 0xd45eff, 0xf160b4, 0xf36f5e, 0xdc8817, 0xb2a400, 0x7fbd00, 0x53ca28, 0x38ca76, 0x36bbcb, 0x2b2b2b, 0x000000, 0x000000, 0xfeffff, 0xb0d2ff, 0xb6bbff, 0xcbb4ff, 0xedbcff, 0xf9bde0, 0xfac3bd, 0xf0ce9f, 0xdfd990, 0xcae393, 0xb8e9a6, 0xade9c6, 0xace3e9, 0xa7a7a7, 0x000000, 0x000000 } };
+static ppu_t ppu = {
+	/* palette generated from http://drag.wootest.net/misc/palgen.html this format is ARGB */
+	.colors = { 0x464646, 0x000154, 0x000070, 0x07006b, 0x280048, 0x3c000e, 0x3e0000, 0x2c0000, 0x0d0300, 0x001500, 0x001f00, 0x001f00, 0x001420, 0x000000, 0x000000, 0x000000, 0x9d9d9d, 0x0041b0, 0x1825d5, 0x4a0dcf, 0x75009f, 0x900153, 0x920f00, 0x7b2800, 0x514400, 0x205c00, 0x006900, 0x006916, 0x005a6a, 0x000000, 0x000000, 0x000000, 0xfeffff, 0x4896ff, 0x626dff, 0x8e5bff, 0xd45eff, 0xf160b4, 0xf36f5e, 0xdc8817, 0xb2a400, 0x7fbd00, 0x53ca28, 0x38ca76, 0x36bbcb, 0x2b2b2b, 0x000000, 0x000000, 0xfeffff, 0xb0d2ff, 0xb6bbff, 0xcbb4ff, 0xedbcff, 0xf9bde0, 0xfac3bd, 0xf0ce9f, 0xdfd990, 0xcae393, 0xb8e9a6, 0xade9c6, 0xace3e9, 0xa7a7a7, 0x000000, 0x000000 } };
 
 #define CTRL_NMI              ((ppu.registers[PPUCTRL] >> 7) & 1)
 #define CTRL_MASTER           ((ppu.registers[PPUCTRL] >> 6) & 1)
@@ -672,12 +671,12 @@ void ppu_tick(void) {
                 v->bits.nt_select = (v->bits.nt_select & 1) | (t.bits.nt_select & 2);
             }
 
-        } else if (ppu.cycle == 340 && ppu.even_odd_toggle && MASK_SHOW_BG) {
+        } else if (ppu.cycle == 340 && ppu.odd && MASK_SHOW_BG) {
             /* skip cycle 0 idle on odd ticks when bg enabled */
             ppu.cycle = 1;
             ppu.scanline = 0;
             ppu.frame_completed = true;
-            ppu.even_odd_toggle = !ppu.even_odd_toggle;
+            ppu.odd = !ppu.odd;
             return;
         }
     }
@@ -692,7 +691,7 @@ void ppu_tick(void) {
         if (++ppu.scanline > 261) {
             ppu.scanline = 0;
             ppu.frame_completed = true;
-            ppu.even_odd_toggle = !ppu.even_odd_toggle;
+            ppu.odd = !ppu.odd;
         }
     }
 }
@@ -723,6 +722,11 @@ uint16_t ppu_get_scanline(void) {
 
 uint8_t *ppu_get_oam(void) {
     return ppu.oam;
+}
+
+void ppu_reset(void) {
+	memset(ppu.registers, 0, sizeof(ppu.registers));
+	ppu.odd = 0;
 }
 
 

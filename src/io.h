@@ -49,7 +49,7 @@ typedef struct {
     bool space;
     bool escape;
     bool backspace;
-    bool f,w,m,g;
+    bool f,w,m,g,r;
     bool nine;
     bool tilde;
 	int wheel_y;

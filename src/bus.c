@@ -74,7 +74,7 @@ void bus_write(uint16_t addr, uint8_t data) {
 }
 
 void system_reset(cpu_t *cpu) {
-    /*ppu_reset();*/
+    ppu_reset();
     cpu_reset(cpu);
 }
 
