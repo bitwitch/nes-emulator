@@ -215,10 +215,10 @@ void do_interrupts(cpu_t *cpu) {
 		cpu_irq(cpu);
 		cart_irq_clear();
 	}
-	if (cpu->op_cycles == 0 && apu_irq_pending()) {
-		cpu_irq(cpu);
-		apu_irq_clear();
-	}
+	// if (cpu->op_cycles == 0 && apu_irq_pending()) {
+		// cpu_irq(cpu);
+		// apu_irq_clear();
+	// }
 }
 
 void emulation_mode_run(cpu_t *cpu) {
