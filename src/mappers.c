@@ -46,7 +46,7 @@ mapper0_map_addr(mapper_t *head, uint16_t addr) {
 
     /* horizontal and vertical nametable mirroring */
     else if (addr < 0x3F00) {
-        uint16_t mapped_addr = (addr & 0x2FFF) - 0x2000;
+        uint32_t mapped_addr = addr & 0x0FFF;
         if (head->mirroring == MIRROR_VERTICAL)
             return mapped_addr & 0x07FF;
         else {
@@ -110,7 +110,7 @@ mapper1_map_addr(mapper_t *head, uint16_t addr) {
 
     // nametable mirroring
     else if (addr < 0x3F00) {
-        uint32_t mapped_addr = (addr & 0x2FFF) - 0x2000;
+        uint32_t mapped_addr = addr & 0x0FFF;
         uint8_t mirror_mode = mapper->control & 0x3;
 
         switch (mirror_mode) {
@@ -252,7 +252,7 @@ mapper2_map_addr(mapper_t *head, uint16_t addr) {
 
     /* horizontal and vertical nametable mirroring */
     else if (addr < 0x3F00) {
-        uint32_t mapped_addr = (addr & 0x2FFF) - 0x2000;
+        uint32_t mapped_addr = addr & 0x0FFF;
         if (head->mirroring == MIRROR_VERTICAL)
             return mapped_addr & 0x07FF;
         else
@@ -309,7 +309,7 @@ mapper3_map_addr(mapper_t *head, uint16_t addr) {
 
     /* horizontal and vertical nametable mirroring */
     else if (addr < 0x3F00) {
-        uint32_t mapped_addr = (addr & 0x2FFF) - 0x2000;
+        uint32_t mapped_addr = addr & 0x0FFF;
         if (head->mirroring == MIRROR_VERTICAL)
             return mapped_addr & 0x07FF;
         else
@@ -596,7 +596,7 @@ mapper7_map_addr(mapper_t *head, uint16_t addr) {
 
     // nametable mirroring
     else if (addr < 0x3F00) {
-        uint32_t mapped_addr = (addr & 0x2FFF) - 0x2000;
+        uint32_t mapped_addr = addr & 0x0FFF;
         if ((mapper->reg >> 4) & 1)
             return (mapped_addr & 0x03FF) + 0x0400; // one-screen, upper bank
         else
