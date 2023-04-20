@@ -46,7 +46,7 @@ REM copy SDL2 libraries to build directory
 
 if not exist inconsolata.ttf xcopy /D ..\inconsolata.ttf .
 
-cl "%~dp0src\main.c" /DSDL_MAIN_HANDLED SDL2.lib /Zi /W2 /nologo /Fenes /I.. /I..\src /ISDL2\include /link /LIBPATH:SDL2\lib
+cl "%~dp0src\main.c" /DSDL_MAIN_HANDLED SDL2.lib /D_CRT_SECURE_NO_WARNINGS /Zi /W3 /nologo /Fenes /I.. /I..\src /ISDL2\include /link /LIBPATH:SDL2\lib
 
 endlocal
 popd
