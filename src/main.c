@@ -56,6 +56,7 @@ extern FILE *logfile;
 static char *cpu_state_lines[MAX_CPU_STATE_LINES];
 static sprite_t pattern_tables[2];
 static sprite_t palettes[8];
+static int debug_selected_palette;
 static uint64_t elapsed_time, last_frame_time;
 static bool frame_prepared;
 
@@ -131,12 +132,16 @@ int main(int argc, char **argv) {
 		if (platform_state.r && !last_platform_state.r)
 			system_reset(&cpu);
 
+		// change selected palette in debug window
+		if (platform_state.p && !last_platform_state.p)
+			debug_selected_palette = (debug_selected_palette + 1) % 8;
+
 		// activate debug window
 		if (platform_state.tilde && !last_platform_state.tilde) {
 			if (!debug_window.window) {
 				io_init_window(&debug_window, "NES Debug", (int)DEBUG_WINDOW_WIDTH, (int)DEBUG_WINDOW_HEIGHT);
 				init_debug_chr_viewer(pattern_tables, palettes);
-				update_pattern_tables(0, pattern_tables);
+				update_pattern_tables(debug_selected_palette, pattern_tables);
 				update_palettes(palettes);
 			} else {
 				SDL_ShowWindow(debug_window.window);
@@ -238,7 +243,7 @@ void emulation_mode_run(cpu_t *cpu) {
 		frame_prepared = true;
 
 		if (debug_window.window) {
-			update_pattern_tables(0, pattern_tables);
+			update_pattern_tables(debug_selected_palette, pattern_tables);
 			update_palettes(palettes);
 		}
 	}
@@ -261,7 +266,7 @@ void emulation_mode_step_instruction(cpu_t *cpu) {
 		}
 
 		if (debug_window.window) {
-			update_pattern_tables(0, pattern_tables);
+			update_pattern_tables(debug_selected_palette, pattern_tables);
 			update_palettes(palettes);
 		}
 	}
@@ -282,7 +287,7 @@ void emulation_mode_step_frame(cpu_t *cpu) {
 		frame_prepared = true;
 
 		if (debug_window.window) {
-			update_pattern_tables(0, pattern_tables);
+			update_pattern_tables(debug_selected_palette, pattern_tables);
 			update_palettes(palettes);
 		}
 	}
@@ -337,6 +342,45 @@ char **get_dasm_lines(Arena *arena, uint16_t pc) {
 
 	return dasm_lines;
 }
+
+// used just for drawing palettes in debug window
+void update_palettes(sprite_t palettes[8]) {
+    for (int i=0; i<8; ++i) {
+        uint32_t *pixels = palettes[i].pixels;
+        for (int p=0; p<4; ++p) {
+            pixels[p] = get_color_from_palette(i, p);
+        }
+    }
+}
+
+// used just for drawing pattern_tables in debug window
+void update_pattern_tables(int selected_palette, sprite_t pattern_tables[2]) {
+	SDL_Surface *surface = pattern_tables[0].surface;
+	assert(surface->format->BytesPerPixel);
+    int pitch = surface->pitch / surface->format->BytesPerPixel;
+    // for each pattern table
+    for (int table=0; table<2; ++table)
+    // for each tile in the pattern table
+    for (int tile_row=0; tile_row<16; ++tile_row)
+    for (int tile_col=0; tile_col<16; ++tile_col) {
+        int pixel_start = (tile_row*pitch+tile_col)*8;
+        uint16_t tile_start = table*0x1000 + tile_row*0x100 + tile_col*0x10;
+        // for each row in the tile
+        for (int tile_y=0; tile_y<8; ++tile_y) {
+            uint8_t plane0 = ppu_bus_read(tile_start+tile_y);
+            uint8_t plane1 = ppu_bus_read(tile_start+tile_y+8);
+            // for each col in the tile
+            for (int tile_x=0; tile_x<8; ++tile_x) {
+                int i = pixel_start + tile_y*pitch + (7-tile_x);
+                int pal_index = (plane0 & 1) | ((plane1 & 1) << 1);
+                uint32_t color = get_color_from_palette(selected_palette, pal_index);
+                pattern_tables[table].pixels[i] = color;
+                plane0 >>= 1; plane1 >>= 1;
+            }
+        }
+    }
+}
+
 
 void render_cpu_state(cpu_t *cpu, char **lines) {
     snprintf(lines[0], MAX_DEBUG_LINE_CHARS+1, "N V - B D I Z C");
@@ -399,6 +443,13 @@ void render_debug_window(Arena *arena, cpu_t *cpu) {
 
 	render_cpu_state(cpu, cpu_state_lines);
 	render_code(cpu->pc, dasm_lines, MAX_CODE_LINES);
+
+	// draw a box around selected color palette
+	SDL_Rect dstrect = palettes[debug_selected_palette].dstrect;
+	dstrect.x -= 1; dstrect.y -= 1;
+	dstrect.w += 2; dstrect.h += 2;
+	SDL_SetRenderDrawColor(debug_window.renderer, 0xFF, 0xFF, 0xFF, 0xFF);
+	SDL_RenderDrawRect(debug_window.renderer, &dstrect);
 }
 
 #define MAX_LINE_LEN 74

@@ -192,7 +192,6 @@ do_sprite_zero_hit(uint8_t fg_pal_index, uint8_t bg_pal_index) {
     }
 }
 
-
 void ppu_init(uint32_t *pixels) {
     ppu.screen_pixels = pixels;
     /* initialize with some random colors to visualize palette on load */
@@ -201,73 +200,6 @@ void ppu_init(uint32_t *pixels) {
         /*ppu.palette_ram[i] = (uint8_t)(r >> 6);*/
         /*[>ppu.palette_ram[i] = (uint8_t)pixels[i];<]*/
     /*}*/
-}
-
-
-/* used just for debug drawing palettes */
-void update_palettes(sprite_t palettes[8]) {
-    for (int i=0; i<8; ++i) {
-        uint32_t *pixels = palettes[i].pixels;
-        for (int p=0; p<4; ++p) {
-            pixels[p] = get_color_from_palette(i, p);
-        }
-    }
-}
-
-/*
-row 1
-0x0000 - 0x000F
-0x0010 - 0x001F
-0x0020 - 0x002F
-0x0030 - 0x003F
-0x0040 - 0x004F
-0x0050 - 0x005F
-0x0060 - 0x006F
-0x0070 - 0x007F
-0x0080 - 0x008F
-0x0090 - 0x009F
-0x00a0 - 0x00aF
-0x00b0 - 0x00bF
-0x00c0 - 0x00cF
-0x00d0 - 0x00dF
-0x00e0 - 0x00eF
-0x00f0 - 0x00fF
-
-row 2
-0x0100 - 0x010F
-0x0110 - 0x011F
-0x0120 - 0x012F
-
-w = 0x100
-row * w + col
-*/
-
-/* used just for debug drawing pattern_tables */
-void update_pattern_tables(int selected_palette, sprite_t pattern_tables[2]) {
-	SDL_Surface *surface = pattern_tables[0].surface;
-	assert(surface->format->BytesPerPixel);
-    int pitch = surface->pitch / surface->format->BytesPerPixel;
-    /*for each pattern table*/
-    for (int table=0; table<2; ++table)
-    /*for each tile in the pattern table*/
-    for (int tile_row=0; tile_row<16; ++tile_row)
-    for (int tile_col=0; tile_col<16; ++tile_col) {
-        int pixel_start = (tile_row*pitch+tile_col)*8;
-        uint16_t tile_start = table*0x1000 + tile_row*0x100 + tile_col*0x10;
-        /*for each row in the tile*/
-        for (int tile_y=0; tile_y<8; ++tile_y) {
-            uint8_t plane0 = ppu_bus_read(tile_start+tile_y);
-            uint8_t plane1 = ppu_bus_read(tile_start+tile_y+8);
-            /*for each col in the tile*/
-            for (int tile_x=0; tile_x<8; ++tile_x) {
-                int i = pixel_start + tile_y*pitch + (7-tile_x);
-                int pal_index = (plane0 & 1) | ((plane1 & 1) << 1);
-                uint32_t color = get_color_from_palette(selected_palette, pal_index);
-                pattern_tables[table].pixels[i] = color;
-                plane0 >>= 1; plane1 >>= 1;
-            }
-        }
-    }
 }
 
 /* evaluate up to 8 sprites for the next scanline */

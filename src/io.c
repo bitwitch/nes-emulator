@@ -216,6 +216,9 @@ static void do_keyboard_input(SDL_KeyboardEvent *event) {
         case SDL_SCANCODE_R:
             platform_state.r = event->type == SDL_KEYDOWN;
             break;
+        case SDL_SCANCODE_P:
+            platform_state.p = event->type == SDL_KEYDOWN;
+            break;
         case SDL_SCANCODE_9:
             platform_state.nine = event->type == SDL_KEYDOWN;
             break;
