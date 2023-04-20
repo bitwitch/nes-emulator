@@ -133,8 +133,11 @@ int main(int argc, char **argv) {
 			system_reset(&cpu);
 
 		// change selected palette in debug window
-		if (platform_state.p && !last_platform_state.p)
+		if (platform_state.p && !last_platform_state.p) {
 			debug_selected_palette = (debug_selected_palette + 1) % 8;
+			if (debug_window.window)
+				update_pattern_tables(debug_selected_palette, pattern_tables);
+		}
 
 		// activate debug window
 		if (platform_state.tilde && !last_platform_state.tilde) {
@@ -178,7 +181,8 @@ int main(int argc, char **argv) {
 		if (elapsed_time >= MS_PER_FRAME) {
 			// FIXME(shaw): if emulation_mode == EM_STEP_FRAME then
 			// render_memory_window() will not get called until the user
-			// presses input to advance the frame
+			// presses input to advance the frame, also selected palette will
+			// not be rendered
 			if (emulation_mode == EM_STEP_INSTRUCTION || frame_prepared) {
 				io_render_prepare();
 				io_render_sprites();
@@ -264,7 +268,6 @@ void emulation_mode_step_instruction(cpu_t *cpu) {
 			ppu_clear_frame_completed();
 			apu_flush_sound_buffer();
 		}
-
 		if (debug_window.window) {
 			update_pattern_tables(debug_selected_palette, pattern_tables);
 			update_palettes(palettes);
