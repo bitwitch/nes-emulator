@@ -156,7 +156,7 @@ ppu_bus_write(uint16_t addr, uint8_t data) {
 }
 
 static uint32_t
-get_color_from_palette(uint8_t palette_num, uint8_t palette_index) {
+get_color_from_palette(int palette_num, int palette_index) {
     uint16_t addr = palette_num*4 + palette_index;
     if (addr > 0x0F && addr % 4 == 0)
         addr -= 0x10;
@@ -250,10 +250,10 @@ void update_pattern_tables(int selected_palette, sprite_t pattern_tables[2]) {
     /*for each pattern table*/
     for (int table=0; table<2; ++table)
     /*for each tile in the pattern table*/
-    for (uint16_t tile_row=0; tile_row<16; ++tile_row)
-    for (uint16_t tile_col=0; tile_col<16; ++tile_col) {
+    for (int tile_row=0; tile_row<16; ++tile_row)
+    for (int tile_col=0; tile_col<16; ++tile_col) {
+        int pixel_start = (tile_row*pitch+tile_col)*8;
         uint16_t tile_start = table*0x1000 + tile_row*0x100 + tile_col*0x10;
-        uint16_t pixel_start = (tile_row*pitch+tile_col)*8;
         /*for each row in the tile*/
         for (int tile_y=0; tile_y<8; ++tile_y) {
             uint8_t plane0 = ppu_bus_read(tile_start+tile_y);
@@ -261,7 +261,7 @@ void update_pattern_tables(int selected_palette, sprite_t pattern_tables[2]) {
             /*for each col in the tile*/
             for (int tile_x=0; tile_x<8; ++tile_x) {
                 int i = pixel_start + tile_y*pitch + (7-tile_x);
-                uint8_t pal_index = (plane0 & 1) | ((plane1 & 1) << 1);
+                int pal_index = (plane0 & 1) | ((plane1 & 1) << 1);
                 uint32_t color = get_color_from_palette(selected_palette, pal_index);
                 pattern_tables[table].pixels[i] = color;
                 plane0 >>= 1; plane1 >>= 1;

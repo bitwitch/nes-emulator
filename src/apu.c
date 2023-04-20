@@ -239,8 +239,8 @@ void apu_init(void) {
     ad_buffer_size = apu.spec_desired.freq * bufsize_in_ms / 1000;
 
     // enforce minimium size
-    if (ad_buffer_size < apu.spec_desired.samples * 2)
-        ad_buffer_size = apu.spec_desired.samples * 2;
+	uint32_t min_size = apu.spec_desired.samples * 2;
+    if (ad_buffer_size < min_size) ad_buffer_size = min_size;
 
     ad_buffer = malloc(ad_buffer_size * sizeof(float));
     if (!ad_buffer) {
@@ -866,7 +866,7 @@ void apu_tick(void) {
 
     uint8_t pulse1   = 0;
     uint8_t pulse2   = 0;
-    float triangle = 0;
+    float triangle   = 0;
     uint8_t noise    = 0;
     uint8_t dmc      = 0;
 
@@ -889,8 +889,8 @@ void apu_tick(void) {
     noise    = noise_output();
     dmc      = apu.dmc.output;
 
-    float pulse_out = 0.00752 * (pulse1 + pulse2);
-    float tnd_out = 0.00851 * triangle + 0.00494 * noise + 0.00335 * dmc;
+    float pulse_out = 0.00752f * (pulse1 + pulse2);
+    float tnd_out = 0.00851f * triangle + 0.00494f * noise + 0.00335f * dmc;
     float output = pulse_out + tnd_out;
 
     /*float output = pulse_lookup_table[pulse1 + pulse2];*/
