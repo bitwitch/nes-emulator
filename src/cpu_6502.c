@@ -953,12 +953,20 @@ void cache_ins_addr(uint16_t addr) {
 	cached_ins_index = (cached_ins_index+1) % MAX_CACHED_INS;
 }
 
+
 uint16_t get_cached_ins_addr_at(int num_prev_ins) {
-	assert(num_prev_ins < MAX_CACHED_INS);
-	int virtual_index = cached_ins_index - num_prev_ins;
-	int index = virtual_index < 0 ? MAX_CACHED_INS + virtual_index : virtual_index;
-	return cached_ins_addrs[index];
+    assert(num_prev_ins < MAX_CACHED_INS);
+    int index = cached_ins_index - num_prev_ins;
+    if (index < 0) index += MAX_CACHED_INS;
+    return cached_ins_addrs[index];
 }
+
+// uint16_t get_cached_ins_addr_at(int num_prev_ins) {
+	// assert(num_prev_ins < MAX_CACHED_INS);
+	// int virtual_index = cached_ins_index - num_prev_ins;
+	// int index = virtual_index < 0 ? MAX_CACHED_INS + virtual_index : virtual_index;
+	// return cached_ins_addrs[index];
+// }
 
 void init_cached_ins_addrs(cpu_t *cpu) {
 	// save cpu state 
