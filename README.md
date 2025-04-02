@@ -1,4 +1,6 @@
 # NES Emulator
+![nes emulator screenshot](screenshot.png)  
+
 I grew up playing the NES so I really love this system. I learned most of what  
 I know about the NES from the [nesdev wiki](https://www.nesdev.org/wiki/Nesdev_Wiki), the contributors who compiled that  
 information are amazing. Special thanks to Disch [RIP] who wrote many answers  
