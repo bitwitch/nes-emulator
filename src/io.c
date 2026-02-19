@@ -45,7 +45,6 @@ char scancode_to_char[] = {
 };
 
 
-static void generate_font_glyphs(void);
 static void do_keyboard_input(SDL_KeyboardEvent *event);
 static void do_controller_input(SDL_ControllerButtonEvent *event);
 
@@ -418,22 +417,6 @@ void io_render_present(void) {
 	if (memory_window.window)
 		SDL_RenderPresent(memory_window.renderer);
 }
-
-/*
-static void generate_font_glyphs(void) {
-    for (int i=0; i<95; ++i) {
-        int col = i % (font.w/FONT_CHAR_WIDTH);
-        int row = i / (font.w/FONT_CHAR_WIDTH);
-
-        font.glyphs[i] = (SDL_Rect) {
-            .x = col*FONT_CHAR_WIDTH,
-            .y = row*FONT_CHAR_HEIGHT,
-            .w = FONT_CHAR_WIDTH,
-            .h = FONT_CHAR_HEIGHT
-        };
-    }
-}
-*/
 
 /* a subsprite renders a rectangle out of a potentially larger texture */
 sprite_t make_sub_sprite(window_state_t *window, uint32_t *pixels, int w, int h, 
